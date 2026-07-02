@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GenMesh Core — Execution Trace</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <span class="brand-text">GenMesh Core</span>
+      <span class="brand-sub">/ execution trace</span>
+    </div>
+    <div class="mode-switch" role="tablist">
+      <button class="mode-btn active" data-mode="sim" role="tab">Simulated Run</button>
+      <button class="mode-btn" data-mode="live" role="tab">Live Read</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- SIMULATED MODE -->
+  <section id="sim-panel" class="panel">
+    <div class="intro">
+      <p>
+        Один сквозной прогон композитной задачи через полную сеть контрактов:
+        <code>Registry → Coordinator → Agent IC(s) → Aggregator</code>.
+        Каждый шаг ниже — реальная транзакция или view-вызов в модели GenLayer,
+        данные соответствуют контрактам, реализованным на этапах 2–5.
+      </p>
+      <div class="task-input-row">
+        <input id="task-input" type="text"
+          value="Review this DeFi lending pool before listing: high leverage, no timelock on admin functions, TVL just crossed $2M. Proceed? What's the market outlook?"
+        />
+        <button id="run-btn" class="run-btn">Run Demo ▶</button>
+        <button id="reset-btn" class="reset-btn">Reset</button>
+      </div>
+    </div>
+
+    <div class="trace" id="trace"></div>
+  </section>
+
+  <!-- LIVE MODE -->
+  <section id="live-panel" class="panel hidden">
+    <div class="intro">
+      <p>
+        Read-only режим: подтягивает реальное состояние уже задеплоенных контрактов
+        через <code>genlayer-js</code> view-вызовы. Приватные ключи в браузере не
+        используются — только <code>readContract</code>. Отправка задач
+        (<code>submit_task</code>) выполняется отдельно через GenLayer Studio / CLI,
+        здесь только наблюдение за результатом.
+      </p>
+      <div class="live-form">
+        <label>Registry address
+          <input id="registry-addr" type="text" placeholder="0x..." />
+        </label>
+        <label>Aggregator address
+          <input id="aggregator-addr" type="text" placeholder="0x..." />
+        </label>
+        <label>Task ID
+          <input id="task-id-input" type="text" placeholder="0" />
+        </label>
+        <button id="fetch-live-btn" class="run-btn">Fetch Live State ▶</button>
+      </div>
+      <div id="live-status" class="live-status"></div>
+    </div>
+
+    <div class="trace" id="live-trace"></div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  GenMesh Core — composable execution layer for Intelligent Contracts. No external orchestration, no centralized backend.
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
