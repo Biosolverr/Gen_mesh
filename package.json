@@ -1,0 +1,13 @@
+{
+  "name": "genmesh-core",
+  "version": "0.1.0",
+  "description": "Composable execution layer for Intelligent Contracts on GenLayer",
+  "private": true,
+  "scripts": {
+    "deploy": "genlayer deploy"
+  },
+  "devDependencies": {
+    "genlayer-js": "^1.0.0",
+    "typescript": "^5.4.0"
+  }
+}
