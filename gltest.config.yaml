@@ -1,0 +1,17 @@
+# gltest configuration.
+# Default run command:
+#     gltest --network localnet
+#
+# Requires a running local GenLayer environment:
+#     genlayer up
+
+contracts_dir: contracts
+
+networks:
+  localnet:
+    chain_type: localnet
+
+  studionet:
+    chain_type: studionet
+
+default_network: localnet
