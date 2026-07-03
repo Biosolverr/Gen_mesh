@@ -20,7 +20,7 @@ class SecurityAgent(gl.Contract):
     def register_self(self):
         registry = gl.get_contract_at(self.registry_address)
         registry.emit(on="finalized").register(
-            gl.message.contract_address,
+            gl.message.contract_address.as_hex,
             self.name,
             self.capability,
             self.version,
@@ -68,7 +68,7 @@ Assess the risk level and explain briefly why. Respond as strict JSON:
         aggregator = gl.get_contract_at(Address(aggregator_address))
         aggregator.emit(on="finalized").submit_result(
             task_id,
-            gl.message.contract_address,
+            gl.message.contract_address.as_hex,
             self.capability,
             result.get("verdict", "unknown"),
             result.get("summary", ""),
