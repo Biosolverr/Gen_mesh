@@ -84,12 +84,14 @@ Sort the list alphabetically.
             agent = gl.get_contract_at(agent_address)
             agent.emit(on="finalized").execute(task_id, task_text, cap, str(self.aggregator_address))
 
-        # 5. Единственная связь с Aggregator: манифест ожидаемой задачи.
-        #    Coordinator не ждёт ответа и не проверяет результат — на этом
-        #    его роль заканчивается.
+        # Единственная связь с Aggregator: манифест ожидаемой задачи.
+        # register_task больше не принимает список адресов (это ломало
+        # декодирование при ручных тестах в Studio) — сначала фиксируется
+        # количество, затем каждый агент добавляется отдельным вызовом.
         aggregator = gl.get_contract_at(self.aggregator_address)
-        aggregator.emit(on="finalized").register_task(
-            task_id, [addr for addr, _ in assigned]
-        )
+        aggregator.emit(on="finalized").register_task(task_id, u32(len(assigned)))
+        for agent_address, cap in assigned:
+            aggregator.emit(on="finalized").add_expected_agent(task_id, agent_address.as_hex)
 
         return task_id
+
