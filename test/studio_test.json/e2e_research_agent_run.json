@@ -1,0 +1,71 @@
+{
+  "test": "end_to_end_single_agent_chain",
+  "agent_under_test": "ResearchAgent",
+  "network": "GenLayer Studio (studionet)",
+  "test_date": "2026-07-04",
+  "description": "Second confirmed full mesh hop: ResearchAgent.execute() triggers a real non-det LLM call, emits its result to Aggregator via submit_result(), which auto-finalizes and deterministically aggregates since only one submission was expected.",
+  "contracts_used": {
+    "AgentRegistry": "same fresh deploy as SecurityAgent run",
+    "Aggregator": "0x2BD8aaF6C17253454D5eD45E0443a38f019AE409",
+    "ResearchAgent": "0xbecc53363577de1d609988ea7388e46bc68aefc0"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "Aggregator.register_task(task_id=2, expected_count=1)",
+      "purpose": "Register the task manifest before ResearchAgent reports a result",
+      "status": "PASS"
+    },
+    {
+      "step": 2,
+      "action": "Aggregator.add_expected_agent(task_id=2, agent_address=ResearchAgent)",
+      "purpose": "Whitelist ResearchAgent as the sole expected reporter for task_id=2",
+      "status": "PASS"
+    },
+    {
+      "step": 3,
+      "action": "ResearchAgent.execute(task_id=2, task_description='Is it well established that Ethereum fully migrated from proof-of-work to proof-of-stake in 2022?', capability='research', aggregator_address=Aggregator)",
+      "purpose": "Trigger the real non-det LLM call (run_nondet_unsafe + exec_prompt) and emit() the result to Aggregator",
+      "result": {
+        "tx_status": "ACCEPTED",
+        "tx_result": "SUCCESS",
+        "equivalence_principle_output": {
+          "verdict": "confirmed",
+          "summary": "Ethereum completed its transition from proof-of-work to proof-of-stake on September 15, 2022, in an event known as 'The Merge.' This is a well-documented and widely reported milestone in blockchain history."
+        },
+        "validator_consensus": "3 agree, 2 idle (cancelled after quorum reached)"
+      },
+      "status": "PASS"
+    },
+    {
+      "step": 4,
+      "action": "Aggregator.get_result(task_id=2)",
+      "purpose": "Confirm the emit()-triggered submit_result() landed, the task auto-finalized, and aggregation logic ran correctly",
+      "result": {
+        "finalized": true,
+        "verdict": "clear",
+        "summary": "[research] confirmed: Ethereum completed its transition from proof-of-work to proof-of-stake on September 15, 2022, in an event known as 'The Merge.' This is a well-documented and widely reported milestone in blockchain history.",
+        "submissions": [
+          {
+            "agent_address": "0xbecc53363577de1d609988ea7388e46bc68aefc0",
+            "capability": "research",
+            "verdict": "confirmed",
+            "summary": "Ethereum completed its transition from proof-of-work to proof-of-stake on September 15, 2022, in an event known as 'The Merge.' This is a well-documented and widely reported milestone in blockchain history."
+          }
+        ]
+      },
+      "status": "PASS"
+    }
+  ],
+  "architectural_checks_confirmed": [
+    "ResearchAgent's non-det LLM call produced a factually accurate, well-grounded answer (The Merge, Sept 15 2022)",
+    "'confirmed' correctly did NOT escalate to 'flagged' since it is not in negative_verdicts -> deterministic aggregation yielded 'clear'",
+    "Same interface (execute/submit_result) as SecurityAgent, no per-agent special-casing needed on the Aggregator side",
+    "Result reached Aggregator exclusively through emit()->submit_result(), no external channel",
+    "Address round-tripped correctly via .as_hex convention"
+  ],
+  "summary": {
+    "status": "PASS",
+    "note": "Second of three agents confirmed working end-to-end. FinanceAgent (task_id=3) pending. Coordinator not yet exercised."
+  }
+}
