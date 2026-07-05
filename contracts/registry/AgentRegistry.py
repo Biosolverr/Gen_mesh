@@ -87,11 +87,13 @@ class AgentRegistry(gl.Contract):
 
         del self.agents[agent_address]
 
-        remaining = DynArray[Address]()
-        for a in self.agent_addresses:
-            if a != agent_address:
-                remaining.append(a)
-        self.agent_addresses = remaining
+        idx = None
+        for i, a in enumerate(self.agent_addresses):
+            if a == agent_address:
+                idx = i
+                break
+        if idx is not None:
+            del self.agent_addresses[idx]
 
     @gl.public.write
     def update(
@@ -151,3 +153,4 @@ class AgentRegistry(gl.Contract):
                     "active": info.active,
                 })
         return result
+
