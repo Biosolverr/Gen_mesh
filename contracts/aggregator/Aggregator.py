@@ -7,25 +7,31 @@ import json
 @allow_storage
 @dataclass
 class AgentSubmission:
+    task_id: u32
     agent_address: Address
     capability: str
     verdict: str
     summary: str
 
 
-@allow_storage
-@dataclass
-class TaskManifest:
-    expected_agents: DynArray[Address]
-    submissions: DynArray[AgentSubmission]
-    finalized: bool
-    final_verdict: str
-    final_summary: str
-
-
 class Aggregator(gl.Contract):
-    tasks: TreeMap[u32, TaskManifest]
+    # Плоский список ПО ВСЕМ задачам сразу — единственная DynArray в этом
+    # контракте, и она top-level (auto-инициализируется фреймворком при
+    # деплое), поэтому append() безопасен. Никаких DynArray/TreeMap не
+    # создаётся вручную внутри методов — inmem_allocate() оказался
+    # нестабилен на текущем рантайме студионета, поэтому здесь его нет
+    # вообще.
+    submissions: DynArray[AgentSubmission]
+
+    # "Кто ожидается по какой задаче" — вместо вложенной DynArray на
+    # задачу, составной строковый ключ "task_id:address" в плоском TreeMap.
+    expected_flags: TreeMap[str, bool]
+    expected_counts: TreeMap[u32, u32]
+
     task_ids: DynArray[u32]
+    finalized_flags: TreeMap[u32, bool]
+    final_verdicts: TreeMap[u32, str]
+    final_summaries: TreeMap[u32, str]
 
     def __init__(self):
         pass
@@ -38,21 +44,13 @@ class Aggregator(gl.Contract):
                 return True
         return False
 
-    def _is_expected(self, manifest: TaskManifest, agent_address: Address) -> bool:
-        for a in manifest.expected_agents:
-            if a == agent_address:
-                return True
-        return False
+    def _expected_key(self, task_id: u32, agent_address: Address) -> str:
+        return f"{task_id}:{agent_address.as_hex}"
 
-    def _has_submitted(self, manifest: TaskManifest, agent_address: Address) -> bool:
-        for s in manifest.submissions:
-            if s.agent_address == agent_address:
-                return True
-        return False
+    def _submissions_for(self, task_id: u32) -> list:
+        return [s for s in self.submissions if s.task_id == task_id]
 
     def _deterministic_aggregate(self, submissions) -> tuple:
-        # Приоритетный путь: детерминированная композиция, без сравнения
-        # мнений друг с другом — просто табуляция того, что уже пришло.
         negative_verdicts = {"high", "bearish", "unconfirmed", "inconclusive"}
         parts = []
         escalated = False
@@ -65,9 +63,6 @@ class Aggregator(gl.Contract):
         return final_verdict, final_summary
 
     def _llm_aggregate(self, submissions) -> tuple:
-        # Fallback-путь: включается только при конфликте verdict внутри
-        # одной и той же capability — когда композиция без смыслового
-        # разрешения объективно невозможна.
         lines = []
         for s in submissions:
             lines.append(f"- ({s.capability}) verdict={s.verdict}: {s.summary}")
@@ -90,8 +85,7 @@ Respond with JSON only, no markdown formatting.
             return json.dumps(result, sort_keys=True)
 
         # Штатный Equivalence Principle механизм GenLayer для проверки
-        # эквивалентности non-deterministic результата — сравнивается полный
-        # смысл ответа, а не одно поле, как в Agent'ах.
+        # эквивалентности non-deterministic результата.
         raw = gl.eq_principle.prompt_comparative(
             synthesize,
             principle=(
@@ -102,9 +96,7 @@ Respond with JSON only, no markdown formatting.
         parsed = json.loads(raw)
         return parsed.get("verdict", "unresolved"), parsed.get("summary", "")
 
-    def _finalize(self, task_id: u32, manifest: TaskManifest):
-        submissions = manifest.submissions
-
+    def _finalize(self, task_id: u32, submissions: list):
         by_capability = {}
         for s in submissions:
             by_capability.setdefault(s.capability, []).append(s.verdict)
@@ -116,36 +108,46 @@ Respond with JSON only, no markdown formatting.
         else:
             final_verdict, final_summary = self._deterministic_aggregate(submissions)
 
-        manifest.finalized = True
-        manifest.final_verdict = final_verdict
-        manifest.final_summary = final_summary
-        self.tasks[task_id] = manifest
+        self.finalized_flags[task_id] = True
+        self.final_verdicts[task_id] = final_verdict
+        self.final_summaries[task_id] = final_summary
 
     # ---------- public write API ----------
 
     @gl.public.write
-    def register_task(self, task_id: u32, expected_agents: list):
+    def register_task(self, task_id: u32, expected_count: u32):
+        # Список адресов как параметр (list) ломается при ручном декодировании
+        # через Studio UI (проверено — мусорные байты вместо адреса). Поэтому
+        # регистрация задачи отделена от регистрации конкретных ожидаемых
+        # агентов: сюда передаётся только количество, сами адреса добавляются
+        # по одному через add_expected_agent — тем же проверенным паттерном
+        # одиночного str-параметра, что и в Registry.register().
         if self._is_registered(task_id):
             raise gl.vm.UserError("Task already registered")
+        if expected_count == 0:
+            raise gl.vm.UserError("expected_count must be at least 1")
 
-        expected = DynArray[Address]()
-        for a in expected_agents:
-            expected.append(a)
-
-        self.tasks[task_id] = TaskManifest(
-            expected_agents=expected,
-            submissions=DynArray[AgentSubmission](),
-            finalized=False,
-            final_verdict="",
-            final_summary="",
-        )
+        self.expected_counts[task_id] = expected_count
+        self.finalized_flags[task_id] = False
+        self.final_verdicts[task_id] = ""
+        self.final_summaries[task_id] = ""
         self.task_ids.append(task_id)
+
+    @gl.public.write
+    def add_expected_agent(self, task_id: u32, agent_address: str):
+        if not self._is_registered(task_id):
+            raise gl.vm.UserError("Unknown task_id")
+        if self.finalized_flags.get(task_id, False):
+            raise gl.vm.UserError("Task already finalized")
+
+        addr = Address(agent_address)
+        self.expected_flags[self._expected_key(task_id, addr)] = True
 
     @gl.public.write
     def submit_result(
         self,
         task_id: u32,
-        agent_address: Address,
+        agent_address: str,
         capability: str,
         verdict: str,
         summary: str,
@@ -153,32 +155,33 @@ Respond with JSON only, no markdown formatting.
         if not self._is_registered(task_id):
             raise gl.vm.UserError("Unknown task_id")
 
-        manifest = self.tasks[task_id]
+        if self.finalized_flags.get(task_id, False):
+            return  # поздний результат по уже закрытой задаче — no-op
 
-        if manifest.finalized:
-            return  # поздний результат по уже закрытой задаче — no-op, не ошибка
+        addr = Address(agent_address)
 
-        # Не доверяет одному агенту: принимается только результат от адреса,
-        # явно входящего в план этой задачи.
-        if not self._is_expected(manifest, agent_address):
+        key = self._expected_key(task_id, addr)
+        if not self.expected_flags.get(key, False):
             raise gl.vm.UserError("Agent is not part of this task's execution plan")
 
-        # Идемпотентность на случай повторного emit при апелляции.
-        if self._has_submitted(manifest, agent_address):
-            return
+        for s in self._submissions_for(task_id):
+            if s.agent_address == addr:
+                return  # идемпотентность при повторном emit
 
-        manifest.submissions.append(
+        self.submissions.append(
             AgentSubmission(
-                agent_address=agent_address,
+                task_id=task_id,
+                agent_address=addr,
                 capability=capability,
                 verdict=verdict,
                 summary=summary,
             )
         )
-        self.tasks[task_id] = manifest
 
-        if len(manifest.submissions) >= len(manifest.expected_agents):
-            self._finalize(task_id, manifest)
+        updated = self._submissions_for(task_id)
+        expected_count = self.expected_counts.get(task_id, u32(0))
+        if len(updated) >= expected_count:
+            self._finalize(task_id, updated)
 
     # ---------- public view API ----------
 
@@ -186,11 +189,12 @@ Respond with JSON only, no markdown formatting.
     def get_result(self, task_id: u32) -> dict:
         if not self._is_registered(task_id):
             raise gl.vm.UserError("Unknown task_id")
-        manifest = self.tasks[task_id]
+
+        subs = self._submissions_for(task_id)
         return {
-            "finalized": manifest.finalized,
-            "verdict": manifest.final_verdict,
-            "summary": manifest.final_summary,
+            "finalized": self.finalized_flags.get(task_id, False),
+            "verdict": self.final_verdicts.get(task_id, ""),
+            "summary": self.final_summaries.get(task_id, ""),
             "submissions": [
                 {
                     "agent_address": s.agent_address,
@@ -198,6 +202,7 @@ Respond with JSON only, no markdown formatting.
                     "verdict": s.verdict,
                     "summary": s.summary,
                 }
-                for s in manifest.submissions
+                for s in subs
             ],
         }
+
