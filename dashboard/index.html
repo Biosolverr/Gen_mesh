@@ -1,10 +1,124 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GenMesh Core — Execution Trace</title>
-<link rel="stylesheet" href="style.css" />
+<title>GenMesh Core — Control Panel</title>
+<style>
+:root{
+  --bg: #0b0e11;
+  --panel: #12161b;
+  --panel2: #171c22;
+  --line: #232a32;
+  --text: #e6e8eb;
+  --muted: #7c8794;
+  --accent: #3ecf8e;
+  --amber: #f2b33d;
+  --red: #e5484d;
+  --mono: "SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{ box-sizing:border-box; }
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:var(--mono); font-size:14px; line-height:1.5;
+}
+code{ background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:3px; font-size:13px; }
+
+.topbar{
+  border-bottom:1px solid var(--line); position:sticky; top:0;
+  background:rgba(11,14,17,0.92); backdrop-filter:blur(6px); z-index:20;
+}
+.topbar-inner{
+  max-width:980px; margin:0 auto; padding:14px 20px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+}
+.brand{ display:flex; align-items:baseline; gap:8px; }
+.brand-mark{ color:var(--accent); }
+.brand-text{ font-weight:600; letter-spacing:0.02em; }
+.brand-sub{ color:var(--muted); font-size:12px; }
+.session-status{ font-size:12px; color:var(--muted); }
+.session-status.on{ color:var(--accent); }
+
+.wrap{ max-width:980px; margin:0 auto; padding:24px 20px 80px; }
+
+.section{
+  border:1px solid var(--line); border-radius:8px; background:var(--panel);
+  margin-bottom:18px; overflow:hidden;
+}
+.section-header{
+  padding:12px 16px; border-bottom:1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+  user-select:none;
+}
+.section-header h2{ margin:0; font-size:14px; font-weight:600; }
+.section-header .hint{ color:var(--muted); font-size:11px; }
+.section-body{ padding:16px; }
+.section.collapsed .section-body{ display:none; }
+.chevron{ color:var(--muted); font-size:12px; transition:transform .15s ease; }
+.section.collapsed .chevron{ transform:rotate(-90deg); }
+
+p.note{ color:var(--muted); font-size:12.5px; max-width:760px; margin:0 0 12px; }
+
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+label.field{ display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--muted); margin-bottom:8px; }
+label.field input[type="text"], label.field input[type="password"], label.field input[type="number"], label.field textarea{
+  background:var(--panel2); border:1px solid var(--line); color:var(--text);
+  font-family:var(--mono); font-size:13px; padding:8px 10px; border-radius:6px;
+}
+label.field textarea{ resize:vertical; min-height:54px; }
+label.checkbox{ flex-direction:row; align-items:center; gap:8px; font-size:12.5px; color:var(--text); }
+
+button{
+  font-family:var(--mono); font-size:12.5px; padding:8px 14px; border-radius:6px;
+  cursor:pointer; border:1px solid var(--line); background:transparent; color:var(--text);
+}
+button.primary{ background:var(--accent); color:#06120c; border-color:var(--accent); font-weight:600; }
+button.primary:disabled{ opacity:.4; cursor:default; }
+button.ghost{ color:var(--muted); }
+button.small{ padding:5px 10px; font-size:11.5px; }
+
+.method-card{
+  border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:10px; background:var(--panel2);
+}
+.method-card .method-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.method-name{ font-weight:600; }
+.pill{ font-size:10.5px; padding:2px 7px; border-radius:10px; border:1px solid var(--line); color:var(--muted); }
+.pill.write{ color:var(--amber); border-color:rgba(242,179,61,.35); }
+.pill.read{ color:var(--accent); border-color:rgba(62,207,142,.35); }
+.method-result{
+  margin-top:8px; font-size:12px; background:var(--bg); border:1px solid var(--line);
+  border-radius:6px; padding:8px 10px; white-space:pre-wrap; word-break:break-all; display:none;
+}
+.method-result.show{ display:block; }
+
+.addr-input-row{ display:flex; gap:8px; align-items:flex-end; }
+.addr-input-row label.field{ flex:1; margin-bottom:0; }
+
+.log-list{ display:flex; flex-direction:column-reverse; gap:8px; max-height:520px; overflow-y:auto; }
+.log-entry{
+  border:1px solid var(--line); border-radius:6px; padding:10px 12px; background:var(--panel2); font-size:12px;
+}
+.log-entry .log-top{ display:flex; justify-content:space-between; gap:8px; color:var(--muted); font-size:11px; margin-bottom:4px; }
+.log-entry .log-call{ font-weight:600; margin-bottom:4px; }
+.status-badge{ padding:1px 7px; border-radius:8px; font-size:10.5px; border:1px solid var(--line); }
+.status-badge.pending{ color:var(--amber); border-color:rgba(242,179,61,.35); }
+.status-badge.finalized, .status-badge.accepted{ color:var(--accent); border-color:rgba(62,207,142,.35); }
+.status-badge.error{ color:var(--red); border-color:rgba(229,72,77,.35); }
+a.explorer-link{ color:var(--accent); text-decoration:none; }
+a.explorer-link:hover{ text-decoration:underline; }
+
+table{ width:100%; border-collapse:collapse; font-size:12px; }
+th,td{ text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+th{ color:var(--muted); font-weight:500; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; }
+
+.pipeline-trace{ margin-top:14px; display:flex; flex-direction:column; gap:8px; }
+.pipeline-step{ border-left:2px solid var(--line); padding-left:12px; }
+.pipeline-step.active{ border-left-color:var(--accent); }
+.pipeline-step .step-title{ font-weight:600; font-size:12.5px; }
+.pipeline-step .step-body{ color:var(--muted); font-size:12px; margin-top:2px; white-space:pre-wrap; word-break:break-all; }
+
+.footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:20px 20px 40px; border-top:1px solid var(--line); }
+</style>
 </head>
 <body>
 
@@ -13,72 +127,460 @@
     <div class="brand">
       <span class="brand-mark">◆</span>
       <span class="brand-text">GenMesh Core</span>
-      <span class="brand-sub">/ execution trace</span>
+      <span class="brand-sub">/ control panel — studionet</span>
     </div>
-    <div class="mode-switch" role="tablist">
-      <button class="mode-btn active" data-mode="sim" role="tab">Simulated Run</button>
-      <button class="mode-btn" data-mode="live" role="tab">Live Read</button>
-    </div>
+    <div id="session-status" class="session-status">not signed in — reads work, writes need a session key</div>
   </div>
 </header>
 
 <main class="wrap">
 
-  <!-- SIMULATED MODE -->
-  <section id="sim-panel" class="panel">
-    <div class="intro">
-      <p>
-        Один сквозной прогон композитной задачи через полную сеть контрактов:
-        <code>Registry → Coordinator → Agent IC(s) → Aggregator</code>.
-        Каждый шаг ниже — реальная транзакция или view-вызов в модели GenLayer,
-        данные соответствуют контрактам, реализованным на этапах 2–5.
+  <!-- SESSION -->
+  <section class="section" id="sec-session">
+    <div class="section-header" onclick="toggleSection('sec-session')">
+      <h2>Session</h2>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <p class="note">
+        Only needed to send write transactions (register, submit_task, execute, etc.). Reads
+        work without it. The key stays in this tab's memory only — it is never written to
+        localStorage and is cleared on reload. Studionet-only: never paste a mainnet key here.
       </p>
-      <div class="task-input-row">
-        <input id="task-input" type="text"
-          value="Review this DeFi lending pool before listing: high leverage, no timelock on admin functions, TVL just crossed $2M. Proceed? What's the market outlook?"
-        />
-        <button id="run-btn" class="run-btn">Run Demo ▶</button>
-        <button id="reset-btn" class="reset-btn">Reset</button>
+      <div class="addr-input-row">
+        <label class="field">Private key (studionet only)
+          <input type="password" id="pk-input" placeholder="0x..." />
+        </label>
+        <button class="primary" onclick="setSession()">Set Session</button>
+        <button class="ghost" onclick="clearSession()">Clear</button>
       </div>
     </div>
-
-    <div class="trace" id="trace"></div>
   </section>
 
-  <!-- LIVE MODE -->
-  <section id="live-panel" class="panel hidden">
-    <div class="intro">
-      <p>
-        Read-only режим: подтягивает реальное состояние уже задеплоенных контрактов
-        через <code>genlayer-js</code> view-вызовы. Приватные ключи в браузере не
-        используются — только <code>readContract</code>. Отправка задач
-        (<code>submit_task</code>) выполняется отдельно через GenLayer Studio / CLI,
-        здесь только наблюдение за результатом.
-      </p>
-      <div class="live-form">
-        <label>Registry address
-          <input id="registry-addr" type="text" placeholder="0x..." />
-        </label>
-        <label>Aggregator address
-          <input id="aggregator-addr" type="text" placeholder="0x..." />
-        </label>
-        <label>Task ID
-          <input id="task-id-input" type="text" placeholder="0" />
-        </label>
-        <button id="fetch-live-btn" class="run-btn">Fetch Live State ▶</button>
-      </div>
-      <div id="live-status" class="live-status"></div>
+  <!-- ADDRESSES -->
+  <section class="section" id="sec-addrs">
+    <div class="section-header" onclick="toggleSection('sec-addrs')">
+      <h2>Contract Addresses</h2>
+      <span class="chevron">▾</span>
     </div>
+    <div class="section-body">
+      <p class="note">Saved locally in this browser (localStorage) so you don't retype them every visit.</p>
+      <div class="grid2" id="address-inputs"></div>
+      <button class="primary" onclick="saveAddresses()" style="margin-top:8px;">Save Addresses</button>
+    </div>
+  </section>
 
-    <div class="trace" id="live-trace"></div>
+  <!-- FULL PIPELINE -->
+  <section class="section" id="sec-pipeline">
+    <div class="section-header" onclick="toggleSection('sec-pipeline')">
+      <h2>Full Pipeline — submit_task → auto-poll result</h2>
+      <span class="hint">requires Coordinator + Aggregator addresses, and a session key</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <label class="field">Task description
+        <textarea id="pipeline-task">Review this DeFi lending pool before listing: high leverage, no timelock on admin functions, TVL just crossed $2M. Proceed? What's the market outlook?</textarea>
+      </label>
+      <div class="addr-input-row">
+        <label class="field">Task ID to poll (auto-filled if detected, editable)
+          <input type="text" id="pipeline-task-id" placeholder="e.g. 0" />
+        </label>
+        <button class="primary" onclick="runFullPipeline()">Submit Task ▶</button>
+        <button class="ghost" onclick="pollOnce()">Poll get_result once</button>
+      </div>
+      <div class="pipeline-trace" id="pipeline-trace"></div>
+    </div>
+  </section>
+
+  <!-- CONTRACT SECTIONS (generated) -->
+  <div id="contracts-root"></div>
+
+  <!-- ACTIVITY LOG -->
+  <section class="section" id="sec-log">
+    <div class="section-header" onclick="toggleSection('sec-log')">
+      <h2>Activity Log</h2>
+      <span class="hint">every call made from this panel, with tx hash + explorer link for writes</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <button class="ghost small" onclick="clearLog()">Clear Log</button>
+      <div class="log-list" id="log-list" style="margin-top:10px;"></div>
+    </div>
   </section>
 
 </main>
 
 <footer class="footer">
-  GenMesh Core — composable execution layer for Intelligent Contracts. No external orchestration, no centralized backend.
+  GenMesh Core — composable execution layer for Intelligent Contracts. Direct browser ↔ studionet connection via genlayer-js, no backend in between.
 </footer>
 
-<script src="app.js"></script>
+<script>
+const EXPLORER_BASE = "https://explorer-studio.genlayer.com/tx/";
+
+// ---------- contract schema (data-driven form generation) ----------
+const CONTRACTS_CONFIG = [
+  {
+    key: "registry", label: "AgentRegistry", storageKey: "gm_addr_registry",
+    methods: [
+      { name: "register", type: "write", params: ["address","name","capability","version","description"] },
+      { name: "update", type: "write", params: ["address","name","capability","version","description","active"], boolParams: ["active"] },
+      { name: "remove", type: "write", params: ["address"] },
+      { name: "getAgents", type: "read", params: [] },
+      { name: "findByCapability", type: "read", params: ["capability"] },
+    ]
+  },
+  {
+    key: "coordinator", label: "Coordinator", storageKey: "gm_addr_coordinator",
+    methods: [
+      { name: "submit_task", type: "write", params: ["task_description"] },
+      { name: "get_task_count", type: "read", params: [] },
+    ]
+  },
+  {
+    key: "aggregator", label: "Aggregator", storageKey: "gm_addr_aggregator",
+    methods: [
+      { name: "register_task", type: "write", params: ["task_id","expected_count"], numParams: ["task_id","expected_count"] },
+      { name: "add_expected_agent", type: "write", params: ["task_id","agent_address"], numParams: ["task_id"] },
+      { name: "submit_result", type: "write", params: ["task_id","agent_address","capability","verdict","summary"], numParams: ["task_id"] },
+      { name: "get_result", type: "read", params: ["task_id"], numParams: ["task_id"] },
+    ]
+  },
+  {
+    key: "security", label: "SecurityAgent", storageKey: "gm_addr_security",
+    methods: [
+      { name: "register_self", type: "write", params: [] },
+      { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
+      { name: "get_capability", type: "read", params: [] },
+    ]
+  },
+  {
+    key: "research", label: "ResearchAgent", storageKey: "gm_addr_research",
+    methods: [
+      { name: "register_self", type: "write", params: [] },
+      { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
+      { name: "get_capability", type: "read", params: [] },
+    ]
+  },
+  {
+    key: "finance", label: "FinanceAgent", storageKey: "gm_addr_finance",
+    methods: [
+      { name: "register_self", type: "write", params: [] },
+      { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
+      { name: "get_capability", type: "read", params: [] },
+    ]
+  },
+];
+
+// ---------- SDK / session ----------
+let sdk = null;
+let client = null;      // signing client (only after setSession)
+let readClient = null;  // key-less client, reused for reads
+let accountAddr = null;
+
+async function ensureSDK(){
+  if (sdk) return sdk;
+  const core = await import("https://esm.sh/genlayer-js");
+  const chains = await import("https://esm.sh/genlayer-js/chains");
+  sdk = { ...core, chain: chains.studionet };
+  readClient = sdk.createClient({ chain: sdk.chain });
+  return sdk;
+}
+
+async function setSession(){
+  const pk = document.getElementById("pk-input").value.trim();
+  const s = await ensureSDK();
+  const account = pk ? s.createAccount(pk) : s.createAccount();
+  client = s.createClient({ chain: s.chain, account });
+  accountAddr = account.address;
+  const el = document.getElementById("session-status");
+  el.textContent = "Signing as " + accountAddr;
+  el.classList.add("on");
+}
+
+function clearSession(){
+  client = null; accountAddr = null;
+  document.getElementById("pk-input").value = "";
+  const el = document.getElementById("session-status");
+  el.textContent = "not signed in — reads work, writes need a session key";
+  el.classList.remove("on");
+}
+
+// ---------- addresses (persisted) ----------
+function getAddr(key){
+  const cfg = CONTRACTS_CONFIG.find(c => c.key === key);
+  return (localStorage.getItem(cfg.storageKey) || "").trim();
+}
+
+function renderAddressInputs(){
+  const root = document.getElementById("address-inputs");
+  root.innerHTML = CONTRACTS_CONFIG.map(c => `
+    <label class="field">${c.label} address
+      <input type="text" id="addr-${c.key}" placeholder="0x..." value="${getAddr(c.key)}" />
+    </label>
+  `).join("");
+}
+
+function saveAddresses(){
+  CONTRACTS_CONFIG.forEach(c => {
+    const val = document.getElementById("addr-"+c.key).value.trim();
+    localStorage.setItem(c.storageKey, val);
+  });
+  logEvent({ contract: "session", method: "saveAddresses", args: {}, status: "finalized", note: "Addresses saved to localStorage" });
+}
+
+// ---------- generic call helpers ----------
+async function genericRead(address, functionName, args){
+  await ensureSDK();
+  return readClient.readContract({ address, functionName, args });
+}
+
+async function genericWrite(address, functionName, args){
+  await ensureSDK();
+  if (!client) throw new Error("No session key set — open Session panel and click Set Session first.");
+  const hash = await client.writeContract({ address, functionName, args });
+  return hash;
+}
+
+function buildArgs(methodCfg, values){
+  return methodCfg.params.map(p => {
+    let v = values[p];
+    if (methodCfg.numParams && methodCfg.numParams.includes(p)) return Number(v);
+    if (methodCfg.boolParams && methodCfg.boolParams.includes(p)) return !!v;
+    return v;
+  });
+}
+
+// ---------- activity log ----------
+const LOG_KEY = "gm_activity_log";
+let logCounter = 0;
+
+function loadLog(){
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch(e){ return []; }
+}
+function saveLogToStorage(entries){
+  localStorage.setItem(LOG_KEY, JSON.stringify(entries.slice(-100)));
+}
+
+function renderLogEntry(entry){
+  const statusClass = (entry.status || "pending").toLowerCase();
+  const argsStr = entry.args ? JSON.stringify(entry.args) : "{}";
+  const hashHtml = entry.hash
+    ? `<a class="explorer-link" href="${EXPLORER_BASE}${entry.hash}" target="_blank" rel="noopener noreferrer">${entry.hash.slice(0,10)}…${entry.hash.slice(-6)} ↗</a>`
+    : "";
+  const resultHtml = entry.result !== undefined ? `<div>${typeof entry.result === "string" ? entry.result : JSON.stringify(entry.result)}</div>` : "";
+  const errorHtml = entry.error ? `<div style="color:var(--red)">${entry.error}</div>` : "";
+  return `
+    <div class="log-entry" id="log-${entry.id}">
+      <div class="log-top">
+        <span>${entry.timestamp}</span>
+        <span class="status-badge ${statusClass}">${entry.status || "pending"}</span>
+      </div>
+      <div class="log-call">${entry.contract}.${entry.method}(${argsStr})</div>
+      ${hashHtml ? `<div>${hashHtml}</div>` : ""}
+      ${entry.note ? `<div style="color:var(--muted)">${entry.note}</div>` : ""}
+      ${resultHtml}
+      ${errorHtml}
+    </div>
+  `;
+}
+
+function logEvent(partial){
+  const entries = loadLog();
+  const entry = Object.assign({
+    id: "e" + (Date.now()) + "_" + (logCounter++),
+    timestamp: new Date().toLocaleTimeString(),
+    status: "pending",
+  }, partial);
+  entries.push(entry);
+  saveLogToStorage(entries);
+  renderLog();
+  return entry.id;
+}
+
+function updateLogEvent(id, patch){
+  const entries = loadLog();
+  const idx = entries.findIndex(e => e.id === id);
+  if (idx === -1) return;
+  entries[idx] = Object.assign(entries[idx], patch);
+  saveLogToStorage(entries);
+  renderLog();
+}
+
+function renderLog(){
+  const entries = loadLog();
+  document.getElementById("log-list").innerHTML = entries.map(renderLogEntry).join("");
+}
+
+function clearLog(){
+  localStorage.removeItem(LOG_KEY);
+  renderLog();
+}
+
+// ---------- method card execution ----------
+async function runMethod(contractKey, methodName){
+  const cfg = CONTRACTS_CONFIG.find(c => c.key === contractKey);
+  const methodCfg = cfg.methods.find(m => m.name === methodName);
+  const address = document.getElementById("addr-"+contractKey).value.trim();
+  const resultBox = document.getElementById(`result-${contractKey}-${methodName}`);
+
+  if (!address){
+    resultBox.textContent = "Set the contract address above first.";
+    resultBox.classList.add("show");
+    return;
+  }
+
+  const values = {};
+  methodCfg.params.forEach(p => {
+    const el = document.getElementById(`input-${contractKey}-${methodName}-${p}`);
+    values[p] = methodCfg.boolParams && methodCfg.boolParams.includes(p) ? el.checked : el.value.trim();
+  });
+  const args = buildArgs(methodCfg, values);
+
+  const logId = logEvent({ contract: cfg.label, method: methodName, args: values, status: methodCfg.type === "read" ? "reading" : "pending" });
+
+  try {
+    if (methodCfg.type === "read"){
+      const result = await genericRead(address, methodName, args);
+      resultBox.textContent = JSON.stringify(result, null, 2);
+      resultBox.classList.add("show");
+      updateLogEvent(logId, { status: "finalized", result });
+    } else {
+      const hash = await genericWrite(address, methodName, args);
+      resultBox.textContent = "Transaction sent: " + hash;
+      resultBox.classList.add("show");
+      updateLogEvent(logId, { status: "accepted", hash });
+      // best-effort wait for finalization in the background
+      client.waitForTransactionReceipt({ hash, status: "FINALIZED", retries: 60, interval: 4000 })
+        .then(receipt => {
+          updateLogEvent(logId, { status: "finalized", result: receipt?.data ?? receipt });
+          resultBox.textContent += "\nFinalized: " + JSON.stringify(receipt?.data ?? receipt);
+        })
+        .catch(err => {
+          updateLogEvent(logId, { status: "error", error: String(err?.message || err) });
+        });
+    }
+  } catch (err){
+    resultBox.textContent = "Error: " + (err?.message || err);
+    resultBox.classList.add("show");
+    updateLogEvent(logId, { status: "error", error: String(err?.message || err) });
+  }
+}
+
+// ---------- render contract sections ----------
+function renderContracts(){
+  const root = document.getElementById("contracts-root");
+  root.innerHTML = CONTRACTS_CONFIG.map(cfg => {
+    const methodsHtml = cfg.methods.map(m => {
+      const paramsHtml = m.params.map(p => {
+        if (m.boolParams && m.boolParams.includes(p)){
+          return `<label class="field checkbox"><input type="checkbox" id="input-${cfg.key}-${m.name}-${p}" /> ${p}</label>`;
+        }
+        const inputType = (m.numParams && m.numParams.includes(p)) ? "number" : "text";
+        const wide = (p === "task_description" || p === "summary" || p === "description");
+        return `<label class="field">${p}
+          ${wide
+            ? `<textarea id="input-${cfg.key}-${m.name}-${p}"></textarea>`
+            : `<input type="${inputType}" id="input-${cfg.key}-${m.name}-${p}" />`}
+        </label>`;
+      }).join("");
+
+      return `
+        <div class="method-card">
+          <div class="method-head">
+            <span class="method-name">${m.name}</span>
+            <span class="pill ${m.type}">${m.type}</span>
+            <span style="margin-left:auto;">
+              <button class="${m.type === 'write' ? 'primary' : ''} small" onclick="runMethod('${cfg.key}','${m.name}')">
+                ${m.type === "write" ? "Send Transaction" : "Call"}
+              </button>
+            </span>
+          </div>
+          ${paramsHtml ? `<div class="grid2">${paramsHtml}</div>` : ""}
+          <div class="method-result" id="result-${cfg.key}-${m.name}"></div>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <section class="section" id="sec-${cfg.key}">
+        <div class="section-header" onclick="toggleSection('sec-${cfg.key}')">
+          <h2>${cfg.label}</h2>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="section-body">${methodsHtml}</div>
+      </section>
+    `;
+  }).join("");
+}
+
+// ---------- full pipeline convenience ----------
+async function runFullPipeline(){
+  const coordAddr = getAddr("coordinator");
+  const aggAddr = getAddr("aggregator");
+  const desc = document.getElementById("pipeline-task").value.trim();
+  const trace = document.getElementById("pipeline-trace");
+
+  if (!coordAddr){ alert("Set the Coordinator address first."); return; }
+  if (!client){ alert("Set a session key first (Session panel)."); return; }
+
+  trace.innerHTML = "";
+  addTraceStep(trace, "submit_task", "Sending transaction…", true);
+
+  const logId = logEvent({ contract: "Coordinator", method: "submit_task", args: { task_description: desc }, status: "pending" });
+
+  try {
+    const hash = await genericWrite(coordAddr, "submit_task", [desc]);
+    updateLogEvent(logId, { status: "accepted", hash });
+    addTraceStep(trace, "submit_task", "Tx sent: " + hash, true);
+
+    const receipt = await client.waitForTransactionReceipt({ hash, status: "FINALIZED", retries: 60, interval: 4000 });
+    updateLogEvent(logId, { status: "finalized", result: receipt?.data ?? receipt });
+    addTraceStep(trace, "submit_task finalized", JSON.stringify(receipt?.data ?? receipt), true);
+
+    const guessedTaskId = receipt?.data?.result ?? receipt?.data ?? "";
+    document.getElementById("pipeline-task-id").value = (typeof guessedTaskId === "number" || typeof guessedTaskId === "string") ? guessedTaskId : "";
+    addTraceStep(trace, "task_id", "Check the raw output above and correct the Task ID field if needed, then use 'Poll get_result once' (repeat until finalized: true).", false);
+  } catch (err){
+    updateLogEvent(logId, { status: "error", error: String(err?.message || err) });
+    addTraceStep(trace, "error", String(err?.message || err), false);
+  }
+}
+
+async function pollOnce(){
+  const aggAddr = getAddr("aggregator");
+  const taskId = document.getElementById("pipeline-task-id").value.trim();
+  const trace = document.getElementById("pipeline-trace");
+
+  if (!aggAddr){ alert("Set the Aggregator address first."); return; }
+  if (taskId === ""){ alert("Enter a Task ID first."); return; }
+
+  const logId = logEvent({ contract: "Aggregator", method: "get_result", args: { task_id: taskId }, status: "reading" });
+  try {
+    const result = await genericRead(aggAddr, "get_result", [Number(taskId)]);
+    updateLogEvent(logId, { status: "finalized", result });
+    addTraceStep(trace, "get_result(" + taskId + ")", JSON.stringify(result, null, 2), !!result?.finalized);
+  } catch (err){
+    updateLogEvent(logId, { status: "error", error: String(err?.message || err) });
+    addTraceStep(trace, "error", String(err?.message || err), false);
+  }
+}
+
+function addTraceStep(container, title, body, active){
+  const div = document.createElement("div");
+  div.className = "pipeline-step" + (active ? " active" : "");
+  div.innerHTML = `<div class="step-title">${title}</div><div class="step-body">${body}</div>`;
+  container.appendChild(div);
+}
+
+// ---------- section collapse ----------
+function toggleSection(id){
+  document.getElementById(id).classList.toggle("collapsed");
+}
+
+// ---------- init ----------
+renderAddressInputs();
+renderContracts();
+renderLog();
+</script>
 </body>
 </html>
