@@ -79,19 +79,23 @@ Sort the list alphabetically.
         task_id = self.task_counter
         self.task_counter += u32(1)
 
-        # 4. Execution Plan материализуется как fan-out emit() — и ничего после.
-        for agent_address, cap in assigned:
-            agent = gl.get_contract_at(agent_address)
-            agent.emit(on="finalized").execute(task_id, task_text, cap, str(self.aggregator_address))
-
-        # Единственная связь с Aggregator: манифест ожидаемой задачи.
-        # register_task больше не принимает список адресов (это ломало
-        # декодирование при ручных тестах в Studio) — сначала фиксируется
-        # количество, затем каждый агент добавляется отдельным вызовом.
+        # 4. Manifest FIRST: Aggregator must know about this task and its
+        #    expected agents before any agent can possibly report back.
+        #    Previously this ran after the agent dispatch below, which left
+        #    a race — a fast agent's execute() could reach Aggregator before
+        #    register_task()/add_expected_agent() had landed, and its
+        #    submit_result() would fail with "Unknown task_id". Reordering
+        #    removes that race entirely: the manifest is guaranteed to
+        #    exist before a single agent is even called.
         aggregator = gl.get_contract_at(self.aggregator_address)
         aggregator.emit(on="finalized").register_task(task_id, u32(len(assigned)))
         for agent_address, cap in assigned:
             aggregator.emit(on="finalized").add_expected_agent(task_id, agent_address.as_hex)
 
-        return task_id
+        # 5. Execution Plan materializes as fan-out emit() — and nothing
+        #    after. Coordinator does not wait for or verify results.
+        for agent_address, cap in assigned:
+            agent = gl.get_contract_at(agent_address)
+            agent.emit(on="finalized").execute(task_id, task_text, cap, self.aggregator_address.as_hex)
 
+        return task_id
