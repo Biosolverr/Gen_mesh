@@ -15,6 +15,11 @@ class AgentSubmission:
 
 
 class Aggregator(gl.Contract):
+    owner: Address
+    # Unset until the deployer calls set_coordinator() — see __init__.
+    # register_task / add_expected_agent are rejected until this is bound.
+    coordinator_address: Address
+
     # Плоский список ПО ВСЕМ задачам сразу — единственная DynArray в этом
     # контракте, и она top-level (auto-инициализируется фреймворком при
     # деплое), поэтому append() безопасен. Никаких DynArray/TreeMap не
@@ -34,7 +39,13 @@ class Aggregator(gl.Contract):
     final_summaries: TreeMap[u32, str]
 
     def __init__(self):
-        pass
+        self.owner = gl.message.sender_address
+        # Coordinator's own constructor needs Aggregator's address, so the
+        # two contracts can't know each other's address in the same deploy
+        # step. Bootstrap in two steps instead: deploy Aggregator first
+        # (coordinator_address unset), deploy Coordinator with this
+        # Aggregator's address, then call set_coordinator() once as owner.
+        self.coordinator_address = Address("0x0000000000000000000000000000000000000000")
 
     # ---------- internal helpers ----------
 
@@ -49,6 +60,10 @@ class Aggregator(gl.Contract):
 
     def _submissions_for(self, task_id: u32) -> list:
         return [s for s in self.submissions if s.task_id == task_id]
+
+    def _require_coordinator(self):
+        if gl.message.sender_address != self.coordinator_address:
+            raise gl.vm.UserError("Only the coordinator can modify a task manifest")
 
     def _deterministic_aggregate(self, submissions) -> tuple:
         negative_verdicts = {"high", "bearish", "unconfirmed", "inconclusive"}
@@ -115,13 +130,18 @@ Respond with JSON only, no markdown formatting.
     # ---------- public write API ----------
 
     @gl.public.write
+    def set_coordinator(self, coordinator_address: str):
+        if gl.message.sender_address != self.owner:
+            raise gl.vm.UserError("Only the owner can set the coordinator address")
+        self.coordinator_address = Address(coordinator_address)
+
+    @gl.public.write
     def register_task(self, task_id: u32, expected_count: u32):
-        # Список адресов как параметр (list) ломается при ручном декодировании
-        # через Studio UI (проверено — мусорные байты вместо адреса). Поэтому
-        # регистрация задачи отделена от регистрации конкретных ожидаемых
-        # агентов: сюда передаётся только количество, сами адреса добавляются
-        # по одному через add_expected_agent — тем же проверенным паттерном
-        # одиночного str-параметра, что и в Registry.register().
+        # Раньше любой адрес мог зарегистрировать задачу — единственной
+        # границей был "кто первый вызвал". Теперь разрешено только
+        # контракту Coordinator, привязанному через set_coordinator().
+        self._require_coordinator()
+
         if self._is_registered(task_id):
             raise gl.vm.UserError("Task already registered")
         if expected_count == 0:
@@ -135,6 +155,8 @@ Respond with JSON only, no markdown formatting.
 
     @gl.public.write
     def add_expected_agent(self, task_id: u32, agent_address: str):
+        self._require_coordinator()
+
         if not self._is_registered(task_id):
             raise gl.vm.UserError("Unknown task_id")
         if self.finalized_flags.get(task_id, False):
@@ -147,31 +169,34 @@ Respond with JSON only, no markdown formatting.
     def submit_result(
         self,
         task_id: u32,
-        agent_address: str,
         capability: str,
         verdict: str,
         summary: str,
     ):
+        # Идентичность агента берётся ТОЛЬКО из отправителя транзакции.
+        # Раньше agent_address был обычным строковым параметром, который
+        # вызывающий указывал сам — контракт верил ему на слово, и любой
+        # адрес мог выдать себя за любого агента.
+        sender = gl.message.sender_address
+
         if not self._is_registered(task_id):
             raise gl.vm.UserError("Unknown task_id")
 
         if self.finalized_flags.get(task_id, False):
             return  # поздний результат по уже закрытой задаче — no-op
 
-        addr = Address(agent_address)
-
-        key = self._expected_key(task_id, addr)
+        key = self._expected_key(task_id, sender)
         if not self.expected_flags.get(key, False):
             raise gl.vm.UserError("Agent is not part of this task's execution plan")
 
         for s in self._submissions_for(task_id):
-            if s.agent_address == addr:
+            if s.agent_address == sender:
                 return  # идемпотентность при повторном emit
 
         self.submissions.append(
             AgentSubmission(
                 task_id=task_id,
-                agent_address=addr,
+                agent_address=sender,
                 capability=capability,
                 verdict=verdict,
                 summary=summary,
@@ -205,4 +230,3 @@ Respond with JSON only, no markdown formatting.
                 for s in subs
             ],
         }
-
