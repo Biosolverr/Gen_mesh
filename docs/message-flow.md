@@ -1,571 +1,85 @@
-# Message Flow & Consensus
+# Message Flow & Consensus Integration
 
-## Overview
+> **Updated after review (2026-07-05).** A reviewer found four real
+> holes in this chain: `submit_result` didn't authenticate the sender,
+> anyone could modify a task manifest, there was a race condition in
+> emit ordering, and we didn't have a clean e2e run without manual
+> re-sends. All four are fixed — details below. The old version of this
+> section incorrectly called issue #2 "a deliberate MVP simplification,"
+> when it was actually an access-control hole. The wording has been
+> corrected.
 
-This document describes how a single request propagates through GenMesh
-Core and how every execution step integrates with GenLayer's native
-consensus model.
-
-One important design principle should be kept in mind throughout this
-document:
-
-**GenMesh never introduces an additional execution protocol.**
-
-Every step is simply another Intelligent Contract transaction executed
-through the existing GenVM execution model.
-
----
-
-# Complete Execution Timeline
-
-A typical execution consists of several independent transactions.
-
-```
-User
- │
- ▼
-Coordinator.submit_task()
- │
- ├──────────────► Registry.view()
- │
- ├──────────────► Agent.execute()
- │
- ├──────────────► Agent.execute()
- │
- └──────────────► Aggregator.register_task()
-                          │
-                          ▼
-                 Agent.submit_result()
-                          │
-                          ▼
-                 Agent.submit_result()
-                          │
-                          ▼
-                  Aggregator.finalize()
-                          │
-                          ▼
-                 Aggregator.get_result()
-```
-
-Each transaction is independently finalized through Optimistic
-Democracy.
-
-No transaction inherits trust from any previous transaction.
-
----
-
-# Transaction Sequence
-
-Example execution using the dashboard demonstration.
+## Transactions in One Run (current order)
 
 | # | Contract | Method | Type | Trigger |
-|---|----------|--------|------|----------|
-| 1 | Coordinator | `submit_task()` | Non-deterministic | User |
-| 2 | Aggregator | `register_task()` | Deterministic | `emit()` |
-| 3 | SecurityAgent | `execute()` | Non-deterministic | `emit()` |
-| 4 | FinanceAgent | `execute()` | Non-deterministic | `emit()` |
-| 5 | Aggregator | `submit_result()` | Deterministic | SecurityAgent |
-| 6 | Aggregator | `submit_result()` | Deterministic | FinanceAgent |
-| 7 | Aggregator | `_finalize()` | Deterministic or Non-deterministic | Automatic |
-
-The exact ordering of Agent execution is **not guaranteed**.
-
-Agents execute independently.
-
-Results may arrive in any order.
-
----
-
-# Coordinator Transaction
-
-Coordinator performs one runtime planning operation.
-
-Execution consists of:
-
-```
-submit_task()
-        │
-        ▼
-Registry Discovery
-        │
-        ▼
-Capability Planning
-        │
-        ▼
-Execution Dispatch
-```
-
-Coordinator performs only one non-deterministic decision:
-
-```
-Which capabilities are required?
-```
-
-After dispatching execution it becomes inactive.
-
-It does not monitor progress.
-
-It does not retry execution.
-
-It does not wait for results.
-
----
-
-# Agent Transactions
-
-Every selected Agent executes independently.
-
-```
-Coordinator
-      │
-      ▼
-SecurityAgent
-
-Coordinator
-      │
-      ▼
-FinanceAgent
-
-Coordinator
-      │
-      ▼
-ResearchAgent
-```
-
-Each Agent performs:
-
-```
-execute()
-
-↓
-
-run_nondet_unsafe()
-
-↓
-
-Domain-specific inference
-
-↓
-
-submit_result()
-```
-
-Agents never communicate with each other.
-
-Each Agent behaves as an isolated Intelligent Contract.
-
----
-
-# Aggregator Transactions
-
-Aggregator receives one transaction from every participating Agent.
-
-```
-Agent A
-      │
-      ▼
-
-submit_result()
-
-Agent B
-      │
-      ▼
-
-submit_result()
-
-Agent C
-      │
-      ▼
-
-submit_result()
-```
-
-Only after all expected results have arrived does Aggregator begin
-composition.
-
-This separation keeps execution asynchronous while preserving
-deterministic completion.
-
----
-
-# Deterministic Execution
-
-Most transactions are purely deterministic.
-
-Examples include:
-
-- Registry discovery
-- Task registration
-- Result submission
-- Duplicate detection
-- Completion checks
-- Result storage
-
-Every validator executes exactly the same code and must obtain exactly
-the same state transition.
-
-No Equivalence Principle is required.
-
----
-
-# Non-Deterministic Execution
-
-Only three operations may invoke LLM execution.
-
-## Capability Planning
-
-Performed by Coordinator.
-
-Purpose:
-
-```
-User Request
-
-↓
-
-Required Capabilities
-```
-
----
-
-## Domain Inference
-
-Performed independently by each Agent.
-
-Purpose:
-
-```
-Task
-
-↓
-
-Specialized Result
-```
-
----
-
-## Semantic Aggregation
-
-Performed only when deterministic aggregation cannot resolve conflicting
-opinions.
-
-Purpose:
-
-```
-Conflicting Results
-
-↓
-
-Semantic Synthesis
-```
-
-This operation uses the Equivalence Principle rather than strict
-byte-for-byte equality.
-
----
-
-# Deterministic-First Philosophy
-
-Aggregation always follows the same priority.
-
-```
-Results
-
-│
-
-├────────► Compatible
-
-│              │
-
-│              ▼
-
-│      Deterministic Composition
-
-│
-
-└────────► Conflict
-
-               │
-
-               ▼
-
-      Equivalence Principle
-
-               │
-
-               ▼
-
-        LLM Synthesis
-```
-
-LLM execution is considered the fallback path rather than the default
-execution strategy.
-
----
-
-# Consensus Integration
-
-Every transaction follows the same protocol.
-
-```
-Leader
-
-↓
-
-Execution
-
-↓
-
-Validators
-
-↓
-
-Agreement
-
-↓
-
-Finalization
-```
-
-GenMesh introduces no additional consensus layer.
-
-There is:
-
-- no mesh consensus;
-- no coordinator consensus;
-- no agent voting;
-- no quorum protocol.
-
-The project relies entirely on Optimistic Democracy.
-
----
-
-# Parallel Execution
-
-Agents execute independently.
-
-```
-Coordinator
-
-      │
-
- ┌────┴───────────┐
-
- ▼                ▼
-
-Security      Finance
-
-      │         │
-
-      ▼         ▼
-
- submit      submit
-
-      │         │
-
-      └────┬────┘
-
-           ▼
-
-      Aggregator
-```
-
-Arrival order is intentionally ignored.
-
-Aggregator waits until every expected participant has submitted exactly
-one result.
-
----
-
-# Idempotency
-
-GenLayer may replay emitted transactions under specific conditions such
-as appeals.
-
-To remain safe under replay, Aggregator treats duplicate submissions as
-no-ops.
-
-```
-Already Submitted?
-
-      │
-
- ├── Yes → Ignore
-
- └── No → Store
-```
-
-This guarantees deterministic behavior regardless of replay order.
-
----
-
-# Trust Boundary
-
-The current MVP defines one explicit trust boundary.
-
-Coordinator creates the execution manifest.
-
-Aggregator accepts results only from addresses listed inside that
-manifest.
-
-```
-Coordinator
-
-↓
-
-Expected Agents
-
-↓
-
-Aggregator
-
-↓
-
-Accept
-```
-
-Unknown contracts are rejected.
-
-This prevents arbitrary Intelligent Contracts from injecting execution
-results.
-
----
-
-# Known MVP Simplification
-
-Aggregator currently assumes the execution manifest is correct.
-
-If Coordinator assigns an incorrect execution plan, Aggregator will
-follow it.
-
-Future versions could strengthen this assumption by introducing:
-
-- signed execution manifests;
-- capability verification;
-- shared execution descriptors;
-- independently verifiable planning metadata.
-
----
-
-# Failure Scenarios
-
-GenMesh intentionally keeps failure handling simple.
-
-Possible situations include:
-
-## Missing Agent
-
-If no Agent supports a required capability:
-
-```
-Coordinator
-
-↓
-
-No Candidates
-
-↓
-
-Abort
-```
-
----
-
-## Duplicate Submission
-
-If an Agent submits twice:
-
-```
-Submission
-
-↓
-
-Already Exists
-
-↓
-
-Ignored
-```
-
----
-
-## Unknown Agent
-
-If a contract outside the execution plan submits a result:
-
-```
-Unknown Address
-
-↓
-
-Rejected
-```
-
----
-
-## Conflicting Opinions
-
-If Agents disagree:
-
-```
-Conflict
-
-↓
-
-Equivalence Principle
-
-↓
-
-Semantic Synthesis
-```
-
-No manual arbitration layer exists.
-
----
-
-# Why No Mesh Consensus Exists
-
-A common misconception is that coordinating multiple Intelligent
-Contracts requires a second consensus mechanism.
-
-GenMesh demonstrates that this is unnecessary.
-
-Every execution step is already secured individually.
-
-```
-Coordinator
-
-↓
-
-Optimistic Democracy
-
-↓
-
-SecurityAgent
-
-↓
-
-Optimistic Democracy
-
-↓
-
-FinanceAgent
-
-↓
-
-Optimistic Democracy
-
-↓
-
-Aggregator
-
-↓
-
-Optimistic Democracy
-```
-
-Rather than replacing consensus, GenMesh simply composes more
-independently validated transactions.
-
-This preserves GenLayer's native security model while enabling much
-larger execution graphs.
+|---|---|---|---|---|
+| 1 | Coordinator | `submit_task` | non-det | user |
+| 2 | Aggregator | `register_task` | det | `emit()` from tx 1 |
+| 3 | Aggregator | `add_expected_agent` ×N | det | `emit()` from tx 1 |
+| 4 | SecurityAgent | `execute` | non-det | `emit()` from tx 1 |
+| 5 | FinanceAgent | `execute` | non-det | `emit()` from tx 1 |
+| 6 | Aggregator | `submit_result` (Security) | det | `emit()` from tx 4 |
+| 7 | Aggregator | `submit_result` (Finance) | det | `emit()` from tx 5, triggers `_finalize` |
+
+**The order of 2–3 relative to 4–5 is no longer incidental — it's
+guaranteed by the code.** Coordinator used to dispatch `execute()` to
+agents first and only register the manifest in Aggregator afterward.
+That was a race: if an agent finished faster than
+`register_task`/`add_expected_agent` reached Aggregator, its
+`submit_result` would fail with `"Unknown task_id"` — which is exactly
+what happened in our manual studionet tests, where an agent's
+`execute()` had to be manually re-sent (documented as "manual
+re-invocation" in `test/manual-runs/e2e_full_mesh_run.json`). Now
+`Coordinator.submit_task` fully registers the manifest first (steps
+2–3), and only then dispatches tasks to agents (steps 4–5) — so a task
+can never exist in Aggregator later than the first agent is able to
+report on it.
+
+The order of 4–5 relative to each other, and 6–7 relative to each
+other, is still not guaranteed (agents run in parallel) — which is why
+Aggregator counts completion by `len(submissions) >= expected_count`,
+not by a specific arrival order.
+
+## Idempotency
+
+An `emit(on='accepted')` message can be re-sent on appeal (up to ~6
+times). This project uses `on='finalized'` everywhere, which removes
+the need for complex idempotency on intermediate steps, but
+`Aggregator.submit_result` still deduplicates by `agent_address` (taken
+from the sender, see below) — in case some future path switches to
+`accepted` for lower latency.
+
+## Trust Boundaries (fixed after review)
+
+This section used to describe two real access-control failures,
+incorrectly framed as "deliberate MVP simplifications":
+
+1. **`submit_result` didn't verify who actually called it.**
+   `agent_address` was a plain string parameter — the caller specified
+   it themselves, and the contract took it on faith. Any address could
+   impersonate any agent and write an arbitrary verdict into Aggregator.
+   **Fixed:** identity now comes only from `gl.message.sender_address`;
+   the `agent_address` parameter is gone from the signature entirely —
+   it can't be forged because it no longer exists as input.
+
+2. **`register_task`/`add_expected_agent` were open to anyone.** Any
+   address could register an arbitrary `task_id` or append an extra
+   "expected" agent to someone else's manifest.
+   **Fixed:** added a `coordinator_address` field and a
+   `set_coordinator()` method (called once by Aggregator's owner after
+   Coordinator is deployed — a two-step bootstrap, because Coordinator
+   and Aggregator have a circular dependency on each other's address).
+   Both methods now require `gl.message.sender_address ==
+   self.coordinator_address`.
+
+## Why No Separate "Mesh Consensus" Is Needed
+
+No new consensus mechanism was created. Two existing GenVM modes are
+used:
+
+- strict deterministic validation (for `register_task` and
+  conflict-free `submit_result`);
+- the standard Equivalence Principle (`gl.eq_principle.prompt_comparative`)
+  — the same mechanism Coordinator uses for capability matching and
+  each Agent uses for domain inference — applied again at the
+  Aggregator level when a genuine disagreement arises.
