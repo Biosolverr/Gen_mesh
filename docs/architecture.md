@@ -1,387 +1,118 @@
-# GenMesh Core Architecture
+# GenMesh Core — Architecture
 
-## Overview
+## The Idea
 
-GenMesh Core is an infrastructure pattern for GenLayer that extends how
-Intelligent Contracts cooperate during execution.
+GenMesh Core doesn't add another application on top of GenLayer — it
+extends the execution model of Intelligent Contracts itself: the unit
+of execution stops being equal to one contract with one non-det block
+and becomes a runtime-composed graph of Intelligent Contracts, where
+every node independently goes through Optimistic Democracy.
 
-Rather than introducing a new execution environment, orchestration
-framework or consensus protocol, GenMesh demonstrates how existing
-GenLayer primitives can be composed into a runtime execution graph where
-each Intelligent Contract remains independently validated through
-Optimistic Democracy.
+> GenMesh Core doesn't orchestrate AI agents on top of GenLayer — it
+> extends what counts as a single unit of GenVM execution, from one
+> Intelligent Contract to a runtime-composed graph of Intelligent
+> Contracts, each independently secured by Optimistic Democracy.
 
-The project is built entirely from native GenVM components.
-
-No external orchestrator exists.
-
-No centralized scheduler exists.
-
-No off-chain coordination layer exists.
-
----
-
-# Core Idea
-
-Traditional GenLayer execution can be viewed as:
+## Flow Diagram
 
 ```
 User
-    │
-    ▼
-Intelligent Contract
-    │
-    ▼
-run_nondet_unsafe()
-    │
-    ▼
-Optimistic Democracy
+ │
+ ▼
+[TX 1] Coordinator.submit_task()  [@gl.public.write]
+ │  ├─ AgentRegistry.view().findByCapability(...)   ← deterministic read
+ │  └─ run_nondet_unsafe(leader_fn, validator_fn)
+ │        gl.nondet.exec_prompt(planning_prompt, response_format='json')
+ │        → required_capabilities: [...]
+ │  └─ emit(on='finalized').register_task(...) → Aggregator (manifest — FIRST)
+ │  └─ emit(on='finalized').add_expected_agent(...) → Aggregator, once per agent
+ │  └─ emit(on='finalized').execute(...) → each selected Agent IC (AFTER the manifest)
+ │
+ ▼
+[TX 2..N] Agent_i.execute(task_id, task_description, capability, aggregator_address)
+ │  └─ run_nondet_unsafe(leader_fn, validator_fn)
+ │        domain-specific gl.nondet.exec_prompt(...)
+ │  └─ emit(on='finalized').submit_result(...) → Aggregator, no address parameter —
+ │        Aggregator derives identity from the transaction sender itself
+ │
+ ▼
+[TX N+1..] Aggregator.submit_result(...)  (once per agent)
+ │  └─ priority: deterministic composition
+ │  └─ fallback: gl.eq_principle.prompt_comparative(...) on a verdict conflict
+ │  └─ finalization: final_verdict, final_summary
+ │
+ ▼
+User / dApp reads Aggregator.view().get_result(task_id)
 ```
 
-GenMesh extends this execution model into:
-
-```
-User
-    │
-    ▼
-Coordinator
-    │
-    ▼
-Registry Discovery
-    │
-    ▼
-Runtime Execution Plan
-    │
-    ▼
-Multiple Intelligent Contracts
-    │
-    ▼
-Aggregator
-    │
-    ▼
-Final Result
-```
-
-Every node remains an ordinary Intelligent Contract.
-
-Every non-deterministic operation remains independently validated.
-
-No execution step bypasses consensus.
-
----
-
-# Vision
-
-GenMesh Core is not another AI-agent framework deployed on a blockchain.
-
-Instead, it explores a different execution model for Intelligent
-Contracts.
-
-Rather than treating a single Intelligent Contract as the only unit of
-execution, GenMesh demonstrates that a complete task can be represented
-as a runtime-composed graph of Intelligent Contracts while preserving
-GenLayer's existing trust model.
-
-This idea can be summarized as:
-
-> GenMesh Core doesn't orchestrate AI agents on top of GenLayer. It
-> extends what can be treated as the effective execution unit of a
-> complex task—from a single Intelligent Contract to a runtime-composed
-> graph of Intelligent Contracts, each independently secured through
-> Optimistic Democracy.
-
----
-
-# Design Goals
-
-GenMesh was designed around several principles.
-
-## Native GenLayer Integration
-
-Every component must be an ordinary Intelligent Contract.
-
-No privileged backend may exist.
-
-No off-chain scheduler may exist.
-
----
-
-## Protocol Compatibility
-
-The project must use existing GenLayer primitives only.
-
-Examples include:
-
-- `@gl.public.write`
-- `@gl.public.view`
-- `gl.get_contract_at()`
-- `emit()`
-- `view()`
-- `run_nondet_unsafe()`
-- `gl.eq_principle.prompt_comparative()`
-
-No custom protocol extensions are introduced.
-
----
-
-## Runtime Composition
-
-Execution plans are created dynamically.
-
-No workflow is predefined.
-
-No execution graph is hardcoded.
-
-The set of participating contracts is determined separately for every
-user request.
-
----
-
-## Independent Validation
-
-Every non-deterministic execution step is validated independently.
-
-Planning.
-
-Inference.
-
-Aggregation.
-
-Each follows the standard Optimistic Democracy process.
-
----
-
-# Non-Goals
-
-GenMesh intentionally does **not** attempt to become:
-
-- a workflow engine;
-- an AI orchestration framework;
-- a custom consensus protocol;
-- an off-chain coordination service;
-- a blockchain operating system.
-
-Its purpose is significantly narrower:
-
-to demonstrate composable execution using native Intelligent Contracts.
-
----
-
-# System Components
-
-The architecture consists of four contract types.
-
-```
-Coordinator
-      │
-      ▼
-Registry
-      │
-      ▼
-Agents
-      │
-      ▼
-Aggregator
-```
-
-Each component has a single responsibility.
-
----
-
-## AgentRegistry
-
-Responsibilities:
-
-- capability discovery;
-- agent registration;
-- capability lookup.
-
-Registry contains no LLM execution.
-
-Registry contains no workflow logic.
-
-Registry contains no execution planning.
-
-It is intentionally deterministic.
-
----
-
-## Coordinator
-
-Coordinator performs exactly one intelligent task:
-
-runtime capability planning.
-
-Responsibilities:
-
-- inspect Registry;
-- determine required capabilities;
-- create execution plan;
-- dispatch execution.
-
-Coordinator does **not**:
-
-- monitor execution;
-- retry failed tasks;
-- maintain workflow state;
-- aggregate results.
-
-This distinction prevents Coordinator from becoming a workflow engine.
-
----
-
-## Agent Contracts
-
-Each Agent is an independent Intelligent Contract.
-
-Responsibilities:
-
-- perform one specialized inference;
-- return one structured result.
-
-Agents know nothing about Coordinator.
-
-Agents trust no caller more than any other Intelligent Contract.
-
-Agents expose a standard execution interface.
-
-Any compatible contract can become part of the mesh.
-
----
-
-## Aggregator
-
-Aggregator performs result composition.
-
-Responsibilities:
-
-- receive Agent results;
-- detect completion;
-- aggregate outputs;
-- publish final result.
-
-Aggregator never:
-
-- discovers agents;
-- creates execution plans;
-- dispatches contracts.
-
-Its role begins only after execution has already started.
-
----
-
-# Architectural Invariants
-
-The project enforces several architectural rules.
-
-## Registry is deterministic
-
-Registry never executes LLM inference.
-
-Its purpose is deterministic discovery.
-
----
-
-## Coordinator plans only
-
-Coordinator decides:
-
-"What should execute?"
-
-It never decides:
-
-"What happened afterwards?"
-
----
-
-## Agents remain independent
-
-Agents never reference Coordinator.
-
-They remain reusable Intelligent Contracts that can be invoked by any
-compatible contract.
-
----
-
-## Aggregator composes only
-
-Aggregation never becomes orchestration.
-
-Planning belongs to Coordinator.
-
-Composition belongs to Aggregator.
-
----
-
-# Native GenLayer Integration
-
-Every architectural decision follows existing GenLayer primitives.
-
-Discovery uses deterministic on-chain state.
-
-Planning uses non-deterministic execution.
-
-Inference uses non-deterministic execution.
-
-Aggregation uses deterministic composition whenever possible and falls
-back to the Equivalence Principle only when semantic synthesis is
-required.
-
-Nothing in the architecture requires modifications to GenVM.
-
----
-
-# Extensibility
-
-Adding a new capability requires only two operations:
-
-1. Deploy a compatible Intelligent Contract.
-2. Call `register_self()`.
-
-Coordinator automatically discovers the new capability during the next
-execution.
-
-No Coordinator upgrade is required.
-
-No Registry modification is required.
-
-No Aggregator modification is required.
-
-This demonstrates runtime composability rather than static integration.
-
----
-
-# Current MVP Limitations
-
-The current implementation intentionally remains minimal.
-
-Known limitations include:
-
-- single-agent selection per capability;
-- trusted execution manifest;
-- no reputation system;
-- no staking;
-- no incentive layer;
-- deterministic provider selection.
-
-These limitations simplify the implementation while preserving the
-architectural idea being validated.
-
----
-
-# Conclusion
-
-GenMesh Core demonstrates that complex execution can emerge from the
-composition of ordinary Intelligent Contracts without introducing a new
-execution environment or consensus mechanism.
-
-Every component remains independently secured by Optimistic Democracy.
-
-Every component remains reusable.
-
-Every component follows a single responsibility.
-
-Rather than replacing GenLayer's execution model, GenMesh explores how
-that model can be composed into larger execution graphs while preserving
-the protocol's native trust assumptions.
-
+The manifest is registered in Aggregator **before** any agent receives
+the task — this is a guarantee, not an incidental ordering (see the fix
+in `docs/message-flow.md`): the order used to be reversed, and a fast
+agent could report back before Aggregator even knew the task existed.
+
+## Roles
+
+| Role | Non-det operations | Knows about | Who can write to its state |
+|---|---|---|---|
+| **AgentRegistry** | none | nobody — pure discovery | the agent itself (self) or the owner |
+| **Coordinator** | capability matching | Registry, Aggregator — does NOT know specific agents | anyone calls `submit_task` (that's the entry point) |
+| **Agent (N of them)** | domain inference | only its own capability — does NOT know about Coordinator | anyone calls `execute` (see invariant 2 below) |
+| **Aggregator** | only on a verdict conflict | nothing beyond what it was told in the manifest | `register_task`/`add_expected_agent` — Coordinator only (`set_coordinator`); `submit_result` — only an address from the manifest, determined by the transaction sender |
+
+## Why This Is Native to GenLayer
+
+- Every node is a full `gl.Contract` using only standard GenVM
+  primitives: `@gl.public.write`/`view`, `gl.get_contract_at()`,
+  `emit()`/`view()`, `run_nondet_unsafe`, `gl.eq_principle.prompt_comparative`.
+- Discovery is `AgentRegistry.view()` — a deterministic read of on-chain
+  state, not an HTTP call to an external service.
+- No hop in the graph is taken out of consensus: planning, each
+  agent-inference call, and conflict-time aggregation are three
+  independent non-det operations, each with its own Leader→Validators
+  cycle.
+
+## Three Invariants Verified at Stage 4 (Agents)
+
+1. The agent doesn't know about Coordinator — zero references to the
+   coordinating layer in the agent's code.
+2. The agent doesn't trust an incoming call any more than it would
+   trust any other IC — the only check (`capability == self.capability`)
+   applies equally to any caller. This is deliberate: `execute()` is
+   open to any caller because the agent itself holds no state that a
+   malicious call could corrupt — the blast radius is limited to one
+   non-det call and, at worst, a rejected write attempt on Aggregator
+   (see the invariant below: Aggregator, not the agent, is the point
+   where identity actually needs to be — and is — verified).
+3. The agent hands off its result only through the contract interface
+   (`aggregator.emit().submit_result(...)`), no external channel.
+   Aggregator, in turn, doesn't trust a parameter for this — sender
+   identity comes from `gl.message.sender_address`, not from an
+   argument a caller could forge.
+
+## Integration with Optimistic Democracy (Stage 5)
+
+Aggregator doesn't add a separate "mesh consensus." It uses exactly two
+standard GenVM modes:
+
+- **Deterministic branch** (`register_task`, conflict-free
+  `submit_result`) — ordinary `@gl.public.write` transactions, verified
+  by strict-equality re-execution, the same way any non-LLM transaction
+  is verified in the network today.
+- **Non-det branch** (`_llm_aggregate` on a verdict conflict) — the
+  standard GenLayer Equivalence Principle mechanism
+  (`gl.eq_principle.prompt_comparative`) for checking equivalence of a
+  non-deterministic result.
+
+The full chain for one task is a set of several independent
+transactions (Coordinator.submit_task, register_task,
+N×add_expected_agent, N×Agent.execute, N×submit_result), each of which
+independently goes through Optimistic Democracy and can be appealed —
+the same as any single IC transaction today.
+
+## Extensibility
+
+Adding a new agent = deploying a contract with the same interface
+(`execute(task_id, task_description, capability, aggregator_address)`)
++ calling `register_self()`. Coordinator doesn't store a list of known
+capabilities and doesn't store agent addresses — both are read fresh
+from Registry on every `submit_task()`. See `agent-integration-guide.md`.
