@@ -15,49 +15,64 @@
   --accent: #3ecf8e;
   --amber: #f2b33d;
   --red: #e5484d;
+  --blue: #5b9cf6;
   --mono: "SF Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 *{ box-sizing:border-box; }
 body{
   margin:0; background:var(--bg); color:var(--text);
-  font-family:var(--mono); font-size:14px; line-height:1.5;
+  font-family:var(--mono); font-size:14px; line-height:1.55;
 }
 code{ background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:3px; font-size:13px; }
 
 .topbar{
   border-bottom:1px solid var(--line); position:sticky; top:0;
-  background:rgba(11,14,17,0.92); backdrop-filter:blur(6px); z-index:20;
+  background:rgba(11,14,17,0.94); backdrop-filter:blur(6px); z-index:20;
 }
 .topbar-inner{
-  max-width:980px; margin:0 auto; padding:14px 20px;
+  max-width:1040px; margin:0 auto; padding:14px 20px;
   display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
 }
 .brand{ display:flex; align-items:baseline; gap:8px; }
 .brand-mark{ color:var(--accent); }
 .brand-text{ font-weight:600; letter-spacing:0.02em; }
 .brand-sub{ color:var(--muted); font-size:12px; }
-.session-status{ font-size:12px; color:var(--muted); }
+.session-status{ font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.session-status .dot{ width:7px; height:7px; border-radius:50%; background:var(--muted); display:inline-block; }
 .session-status.on{ color:var(--accent); }
+.session-status.on .dot{ background:var(--accent); box-shadow:0 0 0 3px rgba(62,207,142,.15); }
 
-.wrap{ max-width:980px; margin:0 auto; padding:24px 20px 80px; }
+.wrap{ max-width:1040px; margin:0 auto; padding:24px 20px 80px; }
+
+.category-label{
+  font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  margin:28px 0 8px; padding-left:2px;
+}
+.category-label:first-child{ margin-top:0; }
 
 .section{
   border:1px solid var(--line); border-radius:8px; background:var(--panel);
-  margin-bottom:18px; overflow:hidden;
+  margin-bottom:14px; overflow:hidden;
 }
 .section-header{
   padding:12px 16px; border-bottom:1px solid var(--line);
-  display:flex; align-items:center; justify-content:space-between; cursor:pointer;
-  user-select:none;
+  display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;
 }
 .section-header h2{ margin:0; font-size:14px; font-weight:600; }
-.section-header .hint{ color:var(--muted); font-size:11px; }
+.section-header .hint{ color:var(--muted); font-size:11px; margin-left:auto; text-align:right; }
 .section-body{ padding:16px; }
 .section.collapsed .section-body{ display:none; }
-.chevron{ color:var(--muted); font-size:12px; transition:transform .15s ease; }
+.section.collapsed .section-header{ border-bottom:none; }
+.chevron{ color:var(--muted); font-size:11px; transition:transform .15s ease; flex-shrink:0; }
 .section.collapsed .chevron{ transform:rotate(-90deg); }
 
-p.note{ color:var(--muted); font-size:12.5px; max-width:760px; margin:0 0 12px; }
+p.note{ color:var(--muted); font-size:12.5px; max-width:820px; margin:0 0 14px; }
+.callout{
+  border:1px solid rgba(91,156,246,.3); background:rgba(91,156,246,.06);
+  border-radius:6px; padding:8px 12px; font-size:11.5px; color:var(--blue);
+  margin:8px 0 12px;
+}
+.callout.warn{ border-color:rgba(242,179,61,.35); background:rgba(242,179,61,.06); color:var(--amber); }
 
 .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 label.field{ display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--muted); margin-bottom:8px; }
@@ -80,7 +95,7 @@ button.small{ padding:5px 10px; font-size:11.5px; }
 .method-card{
   border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:10px; background:var(--panel2);
 }
-.method-card .method-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.method-card .method-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
 .method-name{ font-weight:600; }
 .pill{ font-size:10.5px; padding:2px 7px; border-radius:10px; border:1px solid var(--line); color:var(--muted); }
 .pill.write{ color:var(--amber); border-color:rgba(242,179,61,.35); }
@@ -90,18 +105,19 @@ button.small{ padding:5px 10px; font-size:11.5px; }
   border-radius:6px; padding:8px 10px; white-space:pre-wrap; word-break:break-all; display:none;
 }
 .method-result.show{ display:block; }
+.method-note{ font-size:11px; color:var(--muted); margin:-2px 0 8px; }
 
-.addr-input-row{ display:flex; gap:8px; align-items:flex-end; }
-.addr-input-row label.field{ flex:1; margin-bottom:0; }
+.addr-input-row{ display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+.addr-input-row label.field{ flex:1; min-width:220px; margin-bottom:0; }
 
-.log-list{ display:flex; flex-direction:column-reverse; gap:8px; max-height:520px; overflow-y:auto; }
+.log-list{ display:flex; flex-direction:column-reverse; gap:8px; max-height:560px; overflow-y:auto; }
 .log-entry{
   border:1px solid var(--line); border-radius:6px; padding:10px 12px; background:var(--panel2); font-size:12px;
 }
 .log-entry .log-top{ display:flex; justify-content:space-between; gap:8px; color:var(--muted); font-size:11px; margin-bottom:4px; }
 .log-entry .log-call{ font-weight:600; margin-bottom:4px; }
 .status-badge{ padding:1px 7px; border-radius:8px; font-size:10.5px; border:1px solid var(--line); }
-.status-badge.pending{ color:var(--amber); border-color:rgba(242,179,61,.35); }
+.status-badge.pending, .status-badge.reading{ color:var(--amber); border-color:rgba(242,179,61,.35); }
 .status-badge.finalized, .status-badge.accepted{ color:var(--accent); border-color:rgba(62,207,142,.35); }
 .status-badge.error{ color:var(--red); border-color:rgba(229,72,77,.35); }
 a.explorer-link{ color:var(--accent); text-decoration:none; }
@@ -129,7 +145,7 @@ th{ color:var(--muted); font-weight:500; font-size:10.5px; text-transform:upperc
       <span class="brand-text">GenMesh Core</span>
       <span class="brand-sub">/ control panel — studionet</span>
     </div>
-    <div id="session-status" class="session-status">not signed in — reads work, writes need a session key</div>
+    <div id="session-status" class="session-status"><span class="dot"></span>not signed in — reads work, writes need a session key</div>
   </div>
 </header>
 
@@ -143,9 +159,9 @@ th{ color:var(--muted); font-weight:500; font-size:10.5px; text-transform:upperc
     </div>
     <div class="section-body">
       <p class="note">
-        Only needed to send write transactions (register, submit_task, execute, etc.). Reads
-        work without it. The key stays in this tab's memory only — it is never written to
-        localStorage and is cleared on reload. Studionet-only: never paste a mainnet key here.
+        Only needed to send write transactions (register, submit_task, execute, etc.).
+        Reads work without it. The key stays in this tab's memory only — never written
+        to localStorage, cleared on reload. Studionet-only: never paste a mainnet key here.
       </p>
       <div class="addr-input-row">
         <label class="field">Private key (studionet only)
@@ -164,7 +180,7 @@ th{ color:var(--muted); font-weight:500; font-size:10.5px; text-transform:upperc
       <span class="chevron">▾</span>
     </div>
     <div class="section-body">
-      <p class="note">Saved locally in this browser (localStorage) so you don't retype them every visit.</p>
+      <p class="note">Saved locally in this browser (localStorage) so you don't retype them every visit. Pre-filled with your current deployment's addresses below — override and hit Save if you redeploy.</p>
       <div class="grid2" id="address-inputs"></div>
       <button class="primary" onclick="saveAddresses()" style="margin-top:8px;">Save Addresses</button>
     </div>
@@ -173,19 +189,20 @@ th{ color:var(--muted); font-weight:500; font-size:10.5px; text-transform:upperc
   <!-- FULL PIPELINE -->
   <section class="section" id="sec-pipeline">
     <div class="section-header" onclick="toggleSection('sec-pipeline')">
-      <h2>Full Pipeline — submit_task → auto-poll result</h2>
-      <span class="hint">requires Coordinator + Aggregator addresses, and a session key</span>
+      <h2>Full Pipeline</h2>
+      <span class="hint">submit_task → auto-detect tx → manual poll</span>
       <span class="chevron">▾</span>
     </div>
     <div class="section-body">
+      <p class="note">Requires Coordinator address + a session key. Aggregator address is needed for the polling step.</p>
       <label class="field">Task description
         <textarea id="pipeline-task">Review this DeFi lending pool before listing: high leverage, no timelock on admin functions, TVL just crossed $2M. Proceed? What's the market outlook?</textarea>
       </label>
       <div class="addr-input-row">
-        <label class="field">Task ID to poll (auto-filled if detected, editable)
+        <label class="field">Task ID to poll (check the raw output below and correct if needed)
           <input type="text" id="pipeline-task-id" placeholder="e.g. 0" />
         </label>
-        <button class="primary" onclick="runFullPipeline()">Submit Task ▶</button>
+        <button id="btn-pipeline-submit" class="primary write-btn" onclick="runFullPipeline()">Submit Task ▶</button>
         <button class="ghost" onclick="pollOnce()">Poll get_result once</button>
       </div>
       <div class="pipeline-trace" id="pipeline-trace"></div>
@@ -199,7 +216,7 @@ th{ color:var(--muted); font-weight:500; font-size:10.5px; text-transform:upperc
   <section class="section" id="sec-log">
     <div class="section-header" onclick="toggleSection('sec-log')">
       <h2>Activity Log</h2>
-      <span class="hint">every call made from this panel, with tx hash + explorer link for writes</span>
+      <span class="hint">every call from this panel, with tx hash + explorer link for writes</span>
       <span class="chevron">▾</span>
     </div>
     <div class="section-body">
@@ -218,9 +235,13 @@ th{ color:var(--muted); font-weight:500; font-size:10.5px; text-transform:upperc
 const EXPLORER_BASE = "https://explorer-studio.genlayer.com/tx/";
 
 // ---------- contract schema (data-driven form generation) ----------
+// Matches the post-review-fix (2026-07-05) contract interfaces:
+//  - Aggregator.submit_result no longer takes agent_address (sender-authenticated)
+//  - Aggregator gained set_coordinator (owner-only) and coordinator-only
+//    register_task / add_expected_agent
 const CONTRACTS_CONFIG = [
   {
-    key: "registry", label: "AgentRegistry", storageKey: "gm_addr_registry",
+    key: "registry", label: "AgentRegistry", storageKey: "gm_addr_registry", category: "Discovery",
     methods: [
       { name: "register", type: "write", params: ["address","name","capability","version","description"] },
       { name: "update", type: "write", params: ["address","name","capability","version","description","active"], boolParams: ["active"] },
@@ -230,23 +251,36 @@ const CONTRACTS_CONFIG = [
     ]
   },
   {
-    key: "coordinator", label: "Coordinator", storageKey: "gm_addr_coordinator",
+    key: "coordinator", label: "Coordinator", storageKey: "gm_addr_coordinator", category: "Coordination",
     methods: [
       { name: "submit_task", type: "write", params: ["task_description"] },
       { name: "get_task_count", type: "read", params: [] },
     ]
   },
   {
-    key: "aggregator", label: "Aggregator", storageKey: "gm_addr_aggregator",
+    key: "aggregator", label: "Aggregator", storageKey: "gm_addr_aggregator", category: "Composition",
     methods: [
-      { name: "register_task", type: "write", params: ["task_id","expected_count"], numParams: ["task_id","expected_count"] },
-      { name: "add_expected_agent", type: "write", params: ["task_id","agent_address"], numParams: ["task_id"] },
-      { name: "submit_result", type: "write", params: ["task_id","agent_address","capability","verdict","summary"], numParams: ["task_id"] },
+      {
+        name: "set_coordinator", type: "write", params: ["coordinator_address"],
+        note: "Owner-only, one-time bootstrap. Only succeeds if your session key is the account that deployed this Aggregator."
+      },
+      {
+        name: "register_task", type: "write", params: ["task_id","expected_count"], numParams: ["task_id","expected_count"],
+        note: "Coordinator-only. Calling this manually from a human session will correctly fail with \"Only the coordinator can modify a task manifest\" — that rejection is the fix working, not a bug."
+      },
+      {
+        name: "add_expected_agent", type: "write", params: ["task_id","agent_address"], numParams: ["task_id"],
+        note: "Coordinator-only, same as above — expected to reject manual calls."
+      },
+      {
+        name: "submit_result", type: "write", params: ["task_id","capability","verdict","summary"], numParams: ["task_id"],
+        note: "No agent_address parameter — identity is taken from the transaction sender. A manual call from a human session will correctly fail with \"Agent is not part of this task's execution plan\", since your session address isn't a deployed agent contract."
+      },
       { name: "get_result", type: "read", params: ["task_id"], numParams: ["task_id"] },
     ]
   },
   {
-    key: "security", label: "SecurityAgent", storageKey: "gm_addr_security",
+    key: "security", label: "SecurityAgent", storageKey: "gm_addr_security", category: "Agents",
     methods: [
       { name: "register_self", type: "write", params: [] },
       { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
@@ -254,7 +288,7 @@ const CONTRACTS_CONFIG = [
     ]
   },
   {
-    key: "research", label: "ResearchAgent", storageKey: "gm_addr_research",
+    key: "research", label: "ResearchAgent", storageKey: "gm_addr_research", category: "Agents",
     methods: [
       { name: "register_self", type: "write", params: [] },
       { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
@@ -262,7 +296,7 @@ const CONTRACTS_CONFIG = [
     ]
   },
   {
-    key: "finance", label: "FinanceAgent", storageKey: "gm_addr_finance",
+    key: "finance", label: "FinanceAgent", storageKey: "gm_addr_finance", category: "Agents",
     methods: [
       { name: "register_self", type: "write", params: [] },
       { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
@@ -276,6 +310,23 @@ let sdk = null;
 let client = null;      // signing client (only after setSession)
 let readClient = null;  // key-less client, reused for reads
 let accountAddr = null;
+
+// ---------- global write lock ----------
+// All write methods share ONE signing account -> ONE nonce sequence.
+// Firing two writeContract() calls concurrently (e.g. double-click, or
+// clicking a different write button while one is still in flight) risks
+// a nonce collision — exactly the class of bug that has crashed other
+// dApp frontends. The lock covers only "click -> hash received", not
+// full finalization: once a tx has a hash, its nonce is already
+// consumed, so the next write is safe to send immediately.
+let writeInFlight = false;
+
+function setWriteLock(active){
+  writeInFlight = active;
+  document.querySelectorAll(".write-btn").forEach(btn => {
+    btn.disabled = active;
+  });
+}
 
 async function ensureSDK(){
   if (sdk) return sdk;
@@ -293,7 +344,7 @@ async function setSession(){
   client = s.createClient({ chain: s.chain, account });
   accountAddr = account.address;
   const el = document.getElementById("session-status");
-  el.textContent = "Signing as " + accountAddr;
+  el.innerHTML = '<span class="dot"></span>Signing as ' + accountAddr;
   el.classList.add("on");
 }
 
@@ -301,15 +352,13 @@ function clearSession(){
   client = null; accountAddr = null;
   document.getElementById("pk-input").value = "";
   const el = document.getElementById("session-status");
-  el.textContent = "not signed in — reads work, writes need a session key";
+  el.innerHTML = '<span class="dot"></span>not signed in — reads work, writes need a session key';
   el.classList.remove("on");
 }
 
-// ---------- addresses (persisted) ----------
-// Known addresses from today's studionet test run — used only as a
-// fallback default the first time (before anything is saved to
-// localStorage). All six confirmed working together in today's full
-// mesh end-to-end test.
+// ---------- addresses (persisted, with current deployment as fallback default) ----------
+// Falls back to these only when nothing is saved yet in localStorage —
+// once you hit "Save Addresses" once, your saved values always win.
 const DEFAULT_ADDRESSES = {
   registry: "0xAc2053816933fF087712572fC65B9651A7Da90e9",
   coordinator: "0xDb924BE7f03470566Dff0ece04DD6E5896A7249f",
@@ -436,6 +485,7 @@ async function runMethod(contractKey, methodName){
   const methodCfg = cfg.methods.find(m => m.name === methodName);
   const address = document.getElementById("addr-"+contractKey).value.trim();
   const resultBox = document.getElementById(`result-${contractKey}-${methodName}`);
+  const btn = document.getElementById(`btn-${contractKey}-${methodName}`);
 
   if (!address){
     resultBox.textContent = "Set the contract address above first.";
@@ -443,11 +493,33 @@ async function runMethod(contractKey, methodName){
     return;
   }
 
+  // A write button click while another write is still in flight is a
+  // no-op, not a queued action — the lock already disables the button,
+  // this is just a defensive second check in case disabling lags a click.
+  if (methodCfg.type === "write" && writeInFlight){
+    resultBox.textContent = "Another transaction is still in flight — wait for it to get a hash first.";
+    resultBox.classList.add("show");
+    return;
+  }
+
   const values = {};
+  let missingField = null;
   methodCfg.params.forEach(p => {
     const el = document.getElementById(`input-${contractKey}-${methodName}-${p}`);
-    values[p] = methodCfg.boolParams && methodCfg.boolParams.includes(p) ? el.checked : el.value.trim();
+    if (methodCfg.boolParams && methodCfg.boolParams.includes(p)){
+      values[p] = el.checked;
+    } else {
+      values[p] = el.value.trim();
+      if (values[p] === "") missingField = p;
+    }
   });
+
+  if (missingField){
+    resultBox.textContent = `Fill in "${missingField}" first — sending an incomplete call would just fail on-chain after a real transaction round-trip.`;
+    resultBox.classList.add("show");
+    return;
+  }
+
   const args = buildArgs(methodCfg, values);
 
   const logId = logEvent({ contract: cfg.label, method: methodName, args: values, status: methodCfg.type === "read" ? "reading" : "pending" });
@@ -459,11 +531,24 @@ async function runMethod(contractKey, methodName){
       resultBox.classList.add("show");
       updateLogEvent(logId, { status: "finalized", result });
     } else {
-      const hash = await genericWrite(address, methodName, args);
+      setWriteLock(true);
+      const originalLabel = btn ? btn.textContent : null;
+      if (btn) btn.textContent = "Sending…";
+
+      let hash;
+      try {
+        hash = await genericWrite(address, methodName, args);
+      } finally {
+        // Nonce is consumed as soon as we have a hash (or the call
+        // failed before consuming one) — safe to unlock immediately,
+        // no need to wait for finalization.
+        setWriteLock(false);
+        if (btn) btn.textContent = originalLabel;
+      }
+
       resultBox.textContent = "Transaction sent: " + hash;
       resultBox.classList.add("show");
       updateLogEvent(logId, { status: "accepted", hash });
-      // best-effort wait for finalization in the background
       client.waitForTransactionReceipt({ hash, status: "FINALIZED", retries: 60, interval: 4000 })
         .then(receipt => {
           updateLogEvent(logId, { status: "finalized", result: receipt?.data ?? receipt });
@@ -471,6 +556,7 @@ async function runMethod(contractKey, methodName){
         })
         .catch(err => {
           updateLogEvent(logId, { status: "error", error: String(err?.message || err) });
+          resultBox.textContent += "\nError: " + String(err?.message || err);
         });
     }
   } catch (err){
@@ -483,7 +569,15 @@ async function runMethod(contractKey, methodName){
 // ---------- render contract sections ----------
 function renderContracts(){
   const root = document.getElementById("contracts-root");
-  root.innerHTML = CONTRACTS_CONFIG.map(cfg => {
+  let html = "";
+  let lastCategory = null;
+
+  CONTRACTS_CONFIG.forEach(cfg => {
+    if (cfg.category !== lastCategory){
+      html += `<div class="category-label">${cfg.category}</div>`;
+      lastCategory = cfg.category;
+    }
+
     const methodsHtml = cfg.methods.map(m => {
       const paramsHtml = m.params.map(p => {
         if (m.boolParams && m.boolParams.includes(p)){
@@ -504,18 +598,19 @@ function renderContracts(){
             <span class="method-name">${m.name}</span>
             <span class="pill ${m.type}">${m.type}</span>
             <span style="margin-left:auto;">
-              <button class="${m.type === 'write' ? 'primary' : ''} small" onclick="runMethod('${cfg.key}','${m.name}')">
+              <button id="btn-${cfg.key}-${m.name}" class="${m.type === 'write' ? 'primary write-btn' : ''} small" onclick="runMethod('${cfg.key}','${m.name}')">
                 ${m.type === "write" ? "Send Transaction" : "Call"}
               </button>
             </span>
           </div>
+          ${m.note ? `<div class="method-note">${m.note}</div>` : ""}
           ${paramsHtml ? `<div class="grid2">${paramsHtml}</div>` : ""}
           <div class="method-result" id="result-${cfg.key}-${m.name}"></div>
         </div>
       `;
     }).join("");
 
-    return `
+    html += `
       <section class="section" id="sec-${cfg.key}">
         <div class="section-header" onclick="toggleSection('sec-${cfg.key}')">
           <h2>${cfg.label}</h2>
@@ -524,26 +619,48 @@ function renderContracts(){
         <div class="section-body">${methodsHtml}</div>
       </section>
     `;
-  }).join("");
+  });
+
+  root.innerHTML = html;
 }
 
 // ---------- full pipeline convenience ----------
 async function runFullPipeline(){
   const coordAddr = getAddr("coordinator");
-  const aggAddr = getAddr("aggregator");
   const desc = document.getElementById("pipeline-task").value.trim();
   const trace = document.getElementById("pipeline-trace");
 
   if (!coordAddr){ alert("Set the Coordinator address first."); return; }
   if (!client){ alert("Set a session key first (Session panel)."); return; }
+  if (!desc){ alert("Task description is empty."); return; }
+  if (writeInFlight){ alert("Another transaction is still in flight — wait for it to get a hash first."); return; }
 
   trace.innerHTML = "";
   addTraceStep(trace, "submit_task", "Sending transaction…", true);
 
   const logId = logEvent({ contract: "Coordinator", method: "submit_task", args: { task_description: desc }, status: "pending" });
 
+  setWriteLock(true);
+  const btn = document.getElementById("btn-pipeline-submit");
+  const originalLabel = btn ? btn.textContent : null;
+  if (btn) btn.textContent = "Sending…";
+
+  let hash;
   try {
-    const hash = await genericWrite(coordAddr, "submit_task", [desc]);
+    hash = await genericWrite(coordAddr, "submit_task", [desc]);
+  } catch (err){
+    setWriteLock(false);
+    if (btn) btn.textContent = originalLabel;
+    updateLogEvent(logId, { status: "error", error: String(err?.message || err) });
+    addTraceStep(trace, "error", String(err?.message || err), false);
+    return;
+  }
+  // Nonce consumed as soon as we have a hash — safe to unlock now,
+  // finalization can keep running in the background below.
+  setWriteLock(false);
+  if (btn) btn.textContent = originalLabel;
+
+  try {
     updateLogEvent(logId, { status: "accepted", hash });
     addTraceStep(trace, "submit_task", "Tx sent: " + hash, true);
 
