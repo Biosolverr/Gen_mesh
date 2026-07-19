@@ -160,6 +160,20 @@ Optimistic Democracy mechanism already provided by GenLayer.
 
 ---
 
+### 6. Sender-authenticated trust boundaries
+
+Aggregator never accepts caller-supplied identity as fact.
+
+Task-manifest changes (`register_task`, `add_expected_agent`) are
+restricted to the single Coordinator contract Aggregator is bound to.
+Results (`submit_result`) are attributed to the transaction sender
+itself, never to a parameter the caller could set to any value.
+
+Identity verification lives inside the protocol layer — no contract
+takes a caller's word for who it is.
+
+---
+
 # Repository Structure
 
 ```
@@ -182,15 +196,9 @@ genmesh-core/
 ├── deploy/
 │   └── deployScript.ts
 │
-├── test/
-│   ├── test_registry.py
-│   ├── test_coordinator.py
-│   └── test_e2e_flow.py
 │
 ├── dashboard/
 │   ├── index.html
-│   ├── style.css
-│   ├── app.js
 │   └── README.md
 │
 ├── docs/
@@ -238,8 +246,8 @@ Deploy the complete execution mesh:
 genlayer deploy
 ```
 
-The deployment script automatically deploys contracts in dependency
-order:
+The deployment script deploys contracts in dependency order and wires
+them together:
 
 ```
 Registry
@@ -248,10 +256,17 @@ Aggregator
     ↓
 Coordinator
     ↓
+Bind Aggregator ↔ Coordinator
+    ↓
 Agents
     ↓
 Self-registration
 ```
+
+Aggregator and Coordinator reference each other's address, so they
+can't both be constructed in the same step — the deploy script deploys
+Aggregator first, then Coordinator, then binds them together with one
+write call before deploying the agents.
 
 Install Python dependencies:
 
@@ -286,45 +301,30 @@ genlayer call <aggregator_address> get_result --args 0
 
 # Dashboard
 
-The repository contains a standalone execution trace dashboard.
+The repository contains a standalone control panel for the whole mesh.
 
 ```
 dashboard/
 ```
 
-The dashboard is intentionally separated from the contracts.
+It's a single `index.html` file — no build step, no dependencies beyond
+`genlayer-js` loaded from a CDN. It gives direct access to every
+read/write method on all six contracts, connected straight to
+studionet, with no backend in between.
 
-Its purpose is **not** to become a wallet or transaction interface.
+A local signing session (studionet private key, held only in the
+browser tab's memory, never persisted) enables write calls —
+registering an agent, submitting a task, and so on. Read calls work
+without a session key at all.
 
-Its purpose is to visualize the execution flow of GenMesh Core.
+Every call made from the panel is recorded in an Activity Log, with a
+real transaction hash and a link to the network explorer for writes.
+Nothing shown in the panel is simulated — it reflects the live state of
+whatever contracts you point it at.
 
-Two modes are provided:
+Deployment instructions are available in `dashboard/README.md`.
 
-### Simulated Run
-
-Demonstrates the complete execution pipeline using deterministic sample
-data matching the implemented contracts.
-
-This mode exists specifically so reviewers can understand the
-architecture without deploying a test network.
-
-### Live Read
-
-Uses `genlayer-js` to call:
-
-- Registry.getAgents()
-- Aggregator.get_result()
-
-against deployed contracts.
-
-Only read operations are supported.
-
-Transaction submission intentionally remains outside the dashboard.
-
-Embedding private keys into a public Vercel deployment would violate the
-same trust model GenMesh is designed to preserve.
-
-Deployment instructions are available in:
+---
 
 # Current Status
 
@@ -340,15 +340,15 @@ Project maturity:
 | Dashboard | ✅ Implemented |
 | Local Deployment | ✅ Documented |
 | Automated Tests | ✅ Implemented |
-| End-to-End Flow | ✅ Implemented |
+| End-to-End Flow | ✅ Validated on studionet |
 | Vercel Deployment | ✅ Documented |
-| Final Validation Against Latest SDK | ⚠ Pending |
+| SDK Compatibility | ✅ Validated against current GenLayer Studio/SDK |
 
-The architecture is complete and fully documented.
-
-Remaining work primarily consists of validating implementation details
-against the latest released versions of the GenLayer SDK, CLI and
-supporting libraries.
+The architecture, contracts, and dashboard have all been exercised
+end-to-end against a live GenLayer Studio deployment on studionet,
+including the full path from a signed `submit_task` call through
+Coordinator planning, parallel Agent execution, and Aggregator
+composition to a finalized result.
 
 ---
 
@@ -378,26 +378,6 @@ Future versions may support:
 - weighted routing;
 - capability replication;
 - consensus among agents sharing a capability.
-
----
-
-### Trusted execution manifest
-
-Aggregator trusts the task manifest received from Coordinator.
-
-Specifically:
-
-```
-expected_agents
-```
-
-is accepted as the authoritative execution plan.
-
-This keeps the MVP architecture simple while still preserving the
-Coordinator → Agent → Aggregator separation.
-
-Future versions could independently verify execution plans or use
-signed manifests.
 
 ---
 
@@ -678,7 +658,10 @@ Key decisions:
 
 - deterministic-first aggregation;
 - Equivalence Principle only when necessary;
-- no planning responsibilities.
+- no planning responsibilities;
+- task-manifest changes restricted to the bound Coordinator, results
+  attributed to the transaction sender rather than a caller-supplied
+  parameter.
 
 ---
 
@@ -686,13 +669,16 @@ Key decisions:
 
 Goal:
 
-Visualize the complete execution trace.
+Visualize and operate the complete execution trace.
 
 Key decisions:
 
-- static frontend;
-- simulated execution mode;
-- read-only live mode;
+- single static file, no build step;
+- session-based signing, private key held only in browser memory;
+- direct read/write access to every contract method, not just a
+  read-only visualization;
+- activity log with real transaction hashes linked to the network
+  explorer;
 - Vercel deployment.
 
 ---
@@ -701,11 +687,11 @@ Key decisions:
 
 Short-term priorities:
 
-- validate against latest SDK versions;
-- deploy on testnet/studionet;
-- publish dashboard;
-- record demonstration video;
-- gather reviewer feedback.
+- broaden automated `gltest` coverage to mirror what has been validated
+  manually on studionet;
+- track GenLayer testnet/mainnet availability for eventual migration;
+- refine dashboard convenience features around task-id retrieval after
+  `submit_task`.
 
 Medium-term priorities:
 
