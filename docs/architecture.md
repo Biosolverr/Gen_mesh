@@ -46,9 +46,10 @@ User / dApp reads Aggregator.view().get_result(task_id)
 ```
 
 The manifest is registered in Aggregator **before** any agent receives
-the task — this is a guarantee, not an incidental ordering (see the fix
-in `docs/message-flow.md`): the order used to be reversed, and a fast
-agent could report back before Aggregator even knew the task existed.
+the task. This ordering is a guarantee enforced by `Coordinator.submit_task`
+itself, not an artifact of network timing — a task can never exist in
+Aggregator later than the first agent is able to report on it. See
+`docs/message-flow.md` for the full transaction-level breakdown.
 
 ## Roles
 
