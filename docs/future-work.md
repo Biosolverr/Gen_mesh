@@ -127,7 +127,11 @@ aggregation cannot resolve semantic disagreement.
 
 ## Multiple Coordinators
 
-Nothing in the architecture assumes a single Coordinator.
+Aggregator currently binds to a single Coordinator address via
+`set_coordinator()`. Nothing in the broader architecture assumes only
+one Coordinator can ever exist, but the current binding model would
+need to extend from a single trusted address into a set (or a
+registry of its own) for multiple Coordinators to share one Aggregator.
 
 ```
 Registry
@@ -343,25 +347,27 @@ The architecture already supports this pattern without modification.
 
 # Security Improvements
 
-## Stronger Execution Manifest
+## Beyond a Single Bound Coordinator
 
-The current MVP trusts Coordinator's execution manifest.
+Task-manifest changes (`register_task`, `add_expected_agent`) are
+restricted to whichever single Coordinator address Aggregator's owner
+bound via `set_coordinator()`, and results (`submit_result`) are
+attributed to the transaction sender rather than a caller-supplied
+value — an unrelated caller cannot register a task or impersonate an
+agent today.
 
-Future versions may introduce:
-
-- signed manifests;
-- immutable execution descriptors;
-- independently verifiable planning metadata.
-
-This would reduce the remaining trust assumptions.
+What remains open for future work is making that binding itself richer:
+supporting more than one authorized Coordinator, rotating the bound
+address without redeploying, or having Coordinator sign an independently
+verifiable manifest rather than relying on a single fixed address
+comparison.
 
 ---
 
 ## Capability Verification
 
-Aggregator currently validates sender identity.
-
-Future implementations may additionally verify:
+Aggregator currently verifies sender identity for both manifest changes
+and result submissions. Future implementations may additionally verify:
 
 - capability ownership;
 - capability version;
@@ -386,16 +392,17 @@ These policies would remain contract logic rather than protocol changes.
 
 # Dashboard Evolution
 
-The current dashboard focuses on explaining architecture.
-
-Future versions may include:
+The current dashboard already supports direct read/write access to
+every contract method through a signed browser session. Future versions
+may include:
 
 - live transaction streaming;
 - execution graph visualization;
 - appeal visualization;
 - execution timing;
 - contract explorer integration;
-- historical execution browser.
+- historical execution browser;
+- support for networks beyond studionet, once available.
 
 None of these require changes to GenMesh itself.
 
