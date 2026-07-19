@@ -60,11 +60,12 @@ export default async function main(client: GenLayerClient<any>) {
     [registryAddress, aggregatorAddress]
   );
 
-  // Aggregator was deployed before Coordinator existed, so it couldn't be
-  // given the Coordinator's address at construction time — bind it now.
-  // Without this, register_task/add_expected_agent on Aggregator reject
-  // every call with "Only the coordinator can modify a task manifest",
-  // because coordinator_address is still the zero address.
+  // Aggregator and Coordinator reference each other's address, so they
+  // can't both be constructed with the other's address available at
+  // deploy time. Aggregator is deployed first with no Coordinator bound
+  // yet, then this call completes the binding once Coordinator exists.
+  // Until this runs, register_task/add_expected_agent on Aggregator
+  // reject every call, since coordinator_address is still unset.
   await writeAndWait(client, aggregatorAddress, "set_coordinator", [coordinatorAddress]);
   console.log(`bound Aggregator(${aggregatorAddress}) to Coordinator(${coordinatorAddress})`);
 
