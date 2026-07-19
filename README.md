@@ -179,40 +179,33 @@ takes a caller's word for who it is.
 ```
 genmesh-core/
 ├── contracts/
-│   ├── registry/
-│   │   └── AgentRegistry.py
-│   │
-│   ├── coordinator/
-│   │   └── Coordinator.py
-│   │
+│   ├── agents/
+│   │   ├── FinanceAgent.py
+│   │   ├── ResearchAgent.py
+│   │   └── SecurityAgent.py
 │   ├── aggregator/
 │   │   └── Aggregator.py
-│   │
-│   └── agents/
-│       ├── SecurityAgent.py
-│       ├── ResearchAgent.py
-│       └── FinanceAgent.py
-│
+│   ├── coordinator/
+│   │   └── Coordinator.py
+│   └── registry/
+│       └── AgentRegistry.py
+├── dashboard/
+│   ├── README.md
+│   └── index.html
 ├── deploy/
 │   └── deployScript.ts
-│
-│
-├── dashboard/
-│   ├── index.html
-│   └── README.md
-│
 ├── docs/
+│   ├── agent-integration-guide.md
 │   ├── architecture.md
+│   ├── future-work.md
 │   ├── message-flow.md
-│   └── agent-integration-guide.md
-│
+│   └── project-status.md
+├── .gitignore
+├── README.md
 ├── gltest.config.yaml
 ├── package.json
-├── requirements.txt
-└── README.md
+└── requirements.txt
 ```
-
----
 
 # Quick Start (Localnet)
 
