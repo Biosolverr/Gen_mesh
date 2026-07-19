@@ -79,9 +79,9 @@ Available Network-wide
 Registration is permissionless.
 
 The Agent proves ownership simply by calling Registry from its own
-contract address.
-
-No third party can register another contract.
+contract address. Only the agent itself — or the Registry's owner, for
+initial bootstrap — can register a given address. No unrelated third
+party can register a contract on someone else's behalf.
 
 ---
 
@@ -315,7 +315,9 @@ Summary
 
 The internal reasoning may differ completely between Agents.
 
-Aggregator only consumes the standardized output.
+Aggregator only consumes the standardized output, and attributes it to
+whichever address actually sent the transaction — not to a value the
+Agent's code could set arbitrarily.
 
 ---
 
