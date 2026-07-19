@@ -8,13 +8,13 @@ panel shows was pulled directly from the network at call time.
 
 ## What's Inside
 
-- Session — a field for a studionet private key. Only needed for
+- Session - a field for a studionet private key. Only needed for
   write methods (registering an agent, submitting a task, etc.); reads
   work without it. The key lives only in the tab's memory, never goes
   into `localStorage`, and is cleared on reload.
 - Contract Addresses - six fields (Registry, Coordinator,
   Aggregator, three agents), saved to the browser's `localStorage`.
-- **Full Pipeline** — one-button `submit_task` + manual `get_result`
+- **Full Pipeline** - one-button `submit_task` + manual `get_result`
   polling, so you don't have to click through every method individually
   for the typical scenario.
 - One section per contract - a card for every method: Read gets a
@@ -22,7 +22,7 @@ panel shows was pulled directly from the network at call time.
   result area. Write buttons share a single lock — only one signed
   transaction goes out at a time, since every write shares the same
   signing account and nonce sequence.
-- Activity Log — history of every call made from this panel: time,
+- Activity Log - history of every call made from this panel: time,
   contract, method, arguments, status (`pending → accepted →
   finalized`/`error`), and for write calls, a real transaction hash
   with a clickable link to `explorer-studio.genlayer.com`. Stored in
