@@ -12,12 +12,12 @@ panel shows was pulled directly from the network at call time.
   write methods (registering an agent, submitting a task, etc.); reads
   work without it. The key lives only in the tab's memory, never goes
   into `localStorage`, and is cleared on reload.
-- **Contract Addresses** — six fields (Registry, Coordinator,
+- Contract Addresses - six fields (Registry, Coordinator,
   Aggregator, three agents), saved to the browser's `localStorage`.
 - **Full Pipeline** — one-button `submit_task` + manual `get_result`
   polling, so you don't have to click through every method individually
   for the typical scenario.
-- One section per contract — a card for every method: Read gets a
+- One section per contract - a card for every method: Read gets a
   "Call" button, Write gets "Send Transaction," each with its own
   result area. Write buttons share a single lock — only one signed
   transaction goes out at a time, since every write shares the same
@@ -30,10 +30,10 @@ panel shows was pulled directly from the network at call time.
 
 ## Deploying to Vercel (free)
 
-A static file — Vercel detects `index.html` at the root with zero
+A static file - Vercel detects `index.html` at the root with zero
 configuration; no `package.json` or build command needed.
 
-**Option A — via Vercel CLI:**
+**Option A - via Vercel CLI:**
 ```bash
 npm i -g vercel
 cd dashboard
