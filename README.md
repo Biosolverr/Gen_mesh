@@ -273,6 +273,20 @@ Run the complete test suite:
 gltest --network localnet
 ```
 
+## Deployed Addresses (studionet)
+
+| Contract | Address |
+|---|---|
+| AgentRegistry | `0xAc2053816933fF087712572fC65B9651A7Da90e9` |
+| Coordinator | `0xDb924BE7f03470566Dff0ece04DD6E5896A7249f` |
+| Aggregator | `0xA5c46A71793b7AC006f5e411CC6a83A425fdda6B` |
+| SecurityAgent | `0x0742D562e638eef345263B48c5cd01a6B417C4D5` |
+| ResearchAgent | `0x99E7D545B7A33d63D2DEa7EAc2c6F22253db0A17` |
+| FinanceAgent | `0x2223d0cb31aDD28C670aeAfd4167BC4B952EA7Ec` |
+
+These are studionet addresses and may be redeployed as the network
+resets; treat them as the current reference deployment rather than a
+permanent address.
 ---
 
 # Submitting a Task
