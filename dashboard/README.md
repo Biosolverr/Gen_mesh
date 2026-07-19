@@ -1,4 +1,4 @@
-# GenMesh Core — Control Panel
+# GenMesh Core - Control Panel
 
 One file, `index.html`, zero build step, zero dependencies besides
 `genlayer-js`, loaded straight from a CDN in the browser. It gives
