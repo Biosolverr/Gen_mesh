@@ -140,7 +140,10 @@ Important improvements:
 - deterministic-first execution;
 - Equivalence Principle used for semantic synthesis;
 - duplicate protection;
-- expected-agent validation.
+- expected-agent validation;
+- manifest changes restricted to a single bound Coordinator;
+- results attributed to the transaction sender rather than a
+  caller-supplied value.
 
 Status:
 
@@ -150,20 +153,19 @@ Status:
 
 ## Stage 6 — Dashboard
 
-Implemented a visualization layer.
+Implemented a control panel covering every contract in the mesh.
 
 Features:
 
 - complete execution timeline;
 - transaction visualization;
 - execution graph;
-- simulated execution;
-- live read mode;
+- direct read/write access to every contract method;
+- a signed browser session (private key held only in tab memory, never
+  persisted) for write calls;
+- an activity log with real transaction hashes linked to the network
+  explorer;
 - Vercel deployment.
-
-The dashboard intentionally remains read-only.
-
-Private keys are never exposed.
 
 Status:
 
@@ -243,7 +245,9 @@ The project demonstrates:
 - deterministic-first aggregation;
 - semantic conflict resolution;
 - independent Optimistic Democracy validation;
-- permissionless Agent integration.
+- permissionless Agent integration;
+- sender-authenticated trust boundaries between Coordinator, Agents,
+  and Aggregator.
 
 ---
 
@@ -252,19 +256,13 @@ The project demonstrates:
 The current implementation intentionally leaves several improvements for
 future versions.
 
-## Trust Boundary
+## Single Bound Coordinator
 
-Aggregator trusts the execution manifest created by Coordinator.
-
-Future versions could introduce independently verifiable manifests.
-
----
-
-## Capability Verification
-
-Aggregator currently verifies sender identity.
-
-Future versions may additionally verify capability assignments.
+Aggregator accepts manifest changes from exactly one Coordinator address
+at a time, set via `set_coordinator()`. Supporting multiple concurrent
+Coordinators over the same Aggregator, or independently signed
+manifests instead of a single trusted address, is left for future work
+(see `docs/future-work.md`).
 
 ---
 
@@ -305,11 +303,14 @@ These improvements are intentionally outside the MVP scope.
 
 GenMesh inherits GenLayer's security model.
 
-It does not introduce:
+It does not introduce trusted validators, and identity for both
+manifest changes and result submissions is verified at the contract
+level rather than assumed from the caller:
 
-- trusted coordinators;
-- trusted validators;
-- trusted Agents.
+- `Aggregator.register_task` / `add_expected_agent` require the sender
+  to be the bound Coordinator address;
+- `Aggregator.submit_result` attributes a result to the transaction
+  sender, not to any value the caller supplies.
 
 Every execution step remains independently verifiable through
 Optimistic Democracy.
@@ -318,29 +319,16 @@ Optimistic Democracy.
 
 # Dashboard
 
-The included dashboard demonstrates the complete execution lifecycle.
+The included dashboard is a control panel for the complete execution
+lifecycle — every read and write method on all six contracts, connected
+directly to studionet with no backend in between.
 
-Two modes are available.
-
-## Simulated Run
-
-Visualizes a complete execution using predefined data.
-
-Useful for:
-
-- presentations;
-- documentation;
-- architecture reviews.
-
----
-
-## Live Read
-
-Reads deployed contract state directly from GenLayer.
-
-No transaction signing is required.
-
-No private keys are exposed.
+A signed browser session enables write calls (registering an agent,
+submitting a task, and so on); the private key involved is held only in
+the browser tab's memory and is never persisted. Read calls work
+without a session at all. Every call is recorded in an activity log
+with, for writes, a real transaction hash linked to the network
+explorer.
 
 ---
 
@@ -350,10 +338,13 @@ The repository includes:
 
 - unit tests;
 - integration tests;
-- end-to-end execution tests.
+- end-to-end execution tests;
+- a set of recorded manual verification runs against a live studionet
+  deployment, covering each contract individually and the full mesh
+  end to end.
 
-Deployment scripts automatically deploy contracts in dependency order
-and perform Agent self-registration.
+Deployment scripts automatically deploy contracts in dependency order,
+bind Aggregator to Coordinator, and perform Agent self-registration.
 
 ---
 
@@ -415,11 +406,11 @@ Testing
 
 Potential research directions include:
 
-- multiple Coordinators operating over the same Registry;
+- multiple Coordinators operating over the same Registry and Aggregator;
 - Agent reputation systems;
 - capability version negotiation;
 - richer execution planning;
-- decentralized execution manifests;
+- independently verifiable execution manifests;
 - advanced deterministic aggregation strategies;
 - multi-capability Agents;
 - execution graph optimization.
