@@ -1,19 +1,14 @@
 # GenMesh Core — Control Panel
 
 One file, `index.html`, zero build step, zero dependencies besides
-`genlayer-js`, loaded straight from a CDN in the browser. This isn't a
-demo or a visualization — it's a working panel giving direct access to
-every read/write method on all six mesh contracts, connected directly
-to studionet (no backend in between).
-
-This used to be three files (`index.html`/`style.css`/`app.js`) with an
-illustrative "Simulated Run" on made-up data — that version is gone.
-Everything the current panel shows was pulled directly from the network
-at call time; nothing is faked.
+`genlayer-js`, loaded straight from a CDN in the browser. It gives
+direct access to every read/write method on all six mesh contracts,
+connected directly to studionet — no backend in between. Everything the
+panel shows was pulled directly from the network at call time.
 
 ## What's Inside
 
-- **Session** — a field for a studionet private key. Only needed for
+- Session — a field for a studionet private key. Only needed for
   write methods (registering an agent, submitting a task, etc.); reads
   work without it. The key lives only in the tab's memory, never goes
   into `localStorage`, and is cleared on reload.
@@ -22,10 +17,12 @@ at call time; nothing is faked.
 - **Full Pipeline** — one-button `submit_task` + manual `get_result`
   polling, so you don't have to click through every method individually
   for the typical scenario.
-- **One section per contract** — a card for every method: Read gets a
+- One section per contract — a card for every method: Read gets a
   "Call" button, Write gets "Send Transaction," each with its own
-  result area.
-- **Activity Log** — history of every call made from this panel: time,
+  result area. Write buttons share a single lock — only one signed
+  transaction goes out at a time, since every write shares the same
+  signing account and nonce sequence.
+- Activity Log — history of every call made from this panel: time,
   contract, method, arguments, status (`pending → accepted →
   finalized`/`error`), and for write calls, a real transaction hash
   with a clickable link to `explorer-studio.genlayer.com`. Stored in
