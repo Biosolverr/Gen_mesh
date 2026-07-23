@@ -1,0 +1,40 @@
+name: mesh e2e test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (for GenLayer CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependency for GenLayer CLI (keytar/libsecret)
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-0
+
+      - name: Install GenLayer CLI
+        run: npm install -g genlayer
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt --break-system-packages
+          pip install genlayer-test --break-system-packages
+
+      - name: Start local GenLayer environment (Docker is preinstalled on this runner)
+        run: genlayer init --headless --numValidators 5
+
+      - name: Run mesh e2e test
+        run: gltest test/test_mesh_e2e.py --network localnet
