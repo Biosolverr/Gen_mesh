@@ -34,7 +34,7 @@ jobs:
           pip install genlayer-test --break-system-packages
 
       - name: Start local GenLayer environment (Docker is preinstalled on this runner)
-        run: genlayer init --headless --numValidators 5
+        run: yes | genlayer init --headless --numValidators 5
 
       - name: Run mesh e2e test
         run: gltest test/test_mesh_e2e.py --network localnet
