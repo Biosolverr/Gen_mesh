@@ -359,6 +359,75 @@ composition to a finalized result.
 
 ---
 
+# Automated End-to-End Test — Environment Blocker
+
+`test/test_mesh_e2e.py` is committed to the repository and is written to
+run via `gltest --network studionet`, driving the full mesh
+(registration → `submit_task` → Coordinator fan-out → Agent execution →
+Aggregator finalization) without any manual resends. It has been
+executed against a real, live GenLayer Studio deployment — not a mock —
+and reached a signed, `ACTIVATED` transaction on the network.
+
+Running it end to end currently requires a full local GenLayer Studio
+environment (Docker, multiple containers, a live validator set). This
+has not been possible to complete in an automated CI/CLI run so far, for
+reasons unrelated to the contracts:
+
+- **Local hardware constraint.** The development machine cannot run
+  Docker Desktop locally (insufficient virtualization-capable hardware),
+  ruling out running the stack on localhost.
+- **Cloud Docker environments hit unrelated GenLayer CLI/Studio bugs.**
+  Testing moved through GitHub Codespaces and Google Cloud Shell to get
+  a working Docker host. Along the way, several independent bugs were
+  found and worked around in the current GenLayer CLI / Studio backend
+  release, unrelated to this repository's contracts:
+  - `genlayer init`'s Gemini provider setup sends the provider key as
+    `geminiai`, while the backend only recognizes `google` — reproduced
+    identically on CLI 0.38.16 and 0.39.2 (latest stable), and on
+    backend versions v0.65.0 and v0.79.1.
+  - The CLI's default Gemini model (`gemini-1.5-flash`) has been removed
+    from Google's API.
+  - The `gltest.config.yaml` schema shipped with this repository predates
+    a breaking config-format change in the currently published
+    `genlayer-test` package.
+  - Docker's default 64MB `/dev/shm` is too small for a GenVM subprocess
+    that runs unconditionally on every transaction, crashing it
+    regardless of whether the contract touches the internet.
+- **Remaining blocker: backend scheduler.** After working around all of
+  the above (current backend version, valid provider/model, 5 live
+  validators), a submitted transaction reaches `ACTIVATED` status, but
+  the Studio backend's own transaction-processing loop
+  (`backend.consensus.base:_process_pending_transactions`) never picks
+  it up for execution — its internal `Contracts with pending` counter
+  stays at 0 for the full duration of the run, even while the
+  transaction sits with status `PENDING` in the database, so validators
+  never commit a vote. This was reproduced identically across three
+  independent backend/CLI version combinations, ruling out a stale or
+  misconfigured environment.
+
+**Correctness has instead been validated directly against the deployed
+studionet contracts**, using the dashboard described above rather than
+an automated harness:
+
+- `Aggregator.get_result` was called for two separate finalized tasks,
+  returning distinct, non-cached LLM-generated submissions from both
+  agents for each task — confirming the full `submit_task` → Coordinator
+  fan-out → Agent execution → Aggregator finalization path executes
+  correctly and persists on-chain.
+- A manual `register_task` call from a non-Coordinator session reverted
+  with `"Only the coordinator can modify a task manifest"`, and
+  `get_task_count` was unchanged afterward — confirming the
+  coordinator-only manifest restriction is enforced on-chain, not only
+  in source.
+- A manual `add_expected_agent` call from the same non-Coordinator
+  session reverted identically, confirming the restriction applies
+  uniformly across both manifest-mutating methods.
+
+Full logs, version information, and raw RPC output documenting the
+environment issues above are available on request.
+
+---
+
 # Known MVP Limitations
 
 The current version intentionally focuses on validating the execution
