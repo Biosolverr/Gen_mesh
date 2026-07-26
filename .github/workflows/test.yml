@@ -26,16 +26,65 @@ jobs:
       - name: Install system dependency for GenLayer CLI (keytar/libsecret)
         run: sudo apt-get update && sudo apt-get install -y libsecret-1-0
 
+      # --allow-scripts is required: modern npm blocks genlayer's own
+      # postinstall.js by default, which is what generates the .env file
+      # the CLI needs. Without this, `genlayer init` fails with
+      # "ENOENT: no such file or directory, open '.../genlayer/.env'".
       - name: Install GenLayer CLI
-        run: npm install -g genlayer
+        run: npm install -g genlayer --allow-scripts=genlayer,keytar,protobufjs,ssh2,cpu-features,esbuild
 
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt --break-system-packages
           pip install genlayer-test --break-system-packages
+          pip install genlayer-py --upgrade --break-system-packages
 
-      - name: Start local GenLayer environment (Docker is preinstalled on this runner)
-        run: yes | genlayer init --headless --numValidators 1
+      # Skip genlayer init's interactive provider wizard entirely - its
+      # Gemini setup has a confirmed bug (sends provider key "geminiai",
+      # which the backend does not recognize; reproduced on CLI 0.38.16,
+      # 0.39.2, and backend v0.65.0/v0.79.1). Instead:
+      #   1. Write GEMINI_API_KEY directly into the CLI's .env template.
+      #   2. Raise the jsonrpc container's /dev/shm from Docker's 64MB
+      #      default to 1GB - too small crashes GenVM's web-access
+      #      subprocess on every transaction, unrelated to whether the
+      #      contract touches the internet.
+      #   3. Start the stack with genlayer up (no init/provider wizard).
+      #   4. Register a validator directly via the sim_createValidator
+      #      RPC method, bypassing the CLI's own validator-creation gate.
+      - name: Configure GenLayer environment (bypassing known init bugs)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          GENLAYER_DIR=$(npm root -g)/genlayer
+          sed -i "s/^GEMINI_API_KEY=.*/GEMINI_API_KEY=${GEMINI_API_KEY}/" "$GENLAYER_DIR/.env"
+          cat > "$GENLAYER_DIR/docker-compose.override.yml" << 'EOF'
+          services:
+            jsonrpc:
+              shm_size: '1gb'
+              volumes:
+                - ./config-overrides/genvm-module-web.yaml:/genvm/config/genvm-module-web.yaml:ro
+              extra_hosts:
+                - "host.docker.internal:host-gateway"
+                - "anvil-local:host-gateway"
+          EOF
 
+      - name: Start GenLayer Localnet
+        run: genlayer up --headless --numValidators 0
+
+      - name: Register a Gemini validator directly via RPC
+        run: |
+          curl -s --request POST --url http://127.0.0.1:4000/api \
+            --header 'Content-Type: application/json' \
+            --data '{"jsonrpc": "2.0", "method": "sim_createValidator", "params": [1, "google", "gemini-2.5-flash"], "id": 1}'
+
+      # KNOWN OPEN ISSUE: even with all of the above in place, transactions
+      # have been observed to reach ACTIVATED status on the network but
+      # never get picked up by the backend's own consensus scheduler
+      # (backend.consensus.base:_process_pending_transactions logs
+      # "Contracts with pending: 0" indefinitely). Reproduced identically
+      # across backend v0.65.0 and v0.79.1 with CLI 0.38.16 and 0.39.2 -
+      # this is an upstream GenLayer Studio backend bug, not an issue with
+      # this repository's contracts or test. If this step times out, see
+      # the attached debugging log for full reproduction details.
       - name: Run mesh e2e test
         run: gltest test/test_mesh_e2e.py --network localnet
