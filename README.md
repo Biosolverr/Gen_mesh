@@ -167,7 +167,14 @@ Aggregator never accepts caller-supplied identity as fact.
 Task-manifest changes (`register_task`, `add_expected_agent`) are
 restricted to the single Coordinator contract Aggregator is bound to.
 Results (`submit_result`) are attributed to the transaction sender
-itself, never to a parameter the caller could set to any value.
+itself, never to a parameter the caller could set to any value, and the
+submitted capability is checked against the one Coordinator actually
+registered for that sender on that task.
+
+Each Agent's `execute()` is likewise restricted to the single
+Coordinator it's bound to via `set_coordinator()` — task content only
+ever reaches an Agent through that trusted dispatch, never from an
+arbitrary external caller.
 
 Identity verification lives inside the protocol layer — no contract
 takes a caller's word for who it is.
@@ -254,12 +261,17 @@ Bind Aggregator ↔ Coordinator
 Agents
     ↓
 Self-registration
+    ↓
+Bind each Agent ↔ Coordinator
 ```
 
 Aggregator and Coordinator reference each other's address, so they
 can't both be constructed in the same step — the deploy script deploys
 Aggregator first, then Coordinator, then binds them together with one
-write call before deploying the agents.
+write call before deploying the agents. Each Agent is bound to
+Coordinator the same way, one write call per agent, after it
+self-registers — until that call runs, the agent's `execute()` rejects
+every caller, including Coordinator itself.
 
 Install Python dependencies:
 
