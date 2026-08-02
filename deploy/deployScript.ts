@@ -39,21 +39,22 @@ async function writeAndWait(
 // Deploy order follows dependencies, not the alphabet:
 // Registry and Aggregator know nothing about each other — deployed first,
 // in either order relative to one another. Coordinator depends on both
-// addresses. Agents depend only on Registry — they don't need to know
-// about Coordinator.
+// addresses. Agents depend only on Registry at construction time — but,
+// as of the coordinator-only execute() restriction, each agent must also
+// be bound to Coordinator's address via set_coordinator() once Coordinator
+// exists, which is why agents are deployed *after* Coordinator now rather
+// than in any order relative to it.
 export default async function main(client: GenLayerClient<any>) {
   const registryAddress = await deployAndWait(
     client,
     "contracts/registry/AgentRegistry.py",
     []
   );
-
   const aggregatorAddress = await deployAndWait(
     client,
     "contracts/aggregator/Aggregator.py",
     []
   );
-
   const coordinatorAddress = await deployAndWait(
     client,
     "contracts/coordinator/Coordinator.py",
@@ -88,6 +89,15 @@ export default async function main(client: GenLayerClient<any>) {
     console.log(`registered agent ${address}`);
   }
 
+  // Bind each agent to Coordinator, the same two-step bootstrap pattern
+  // already used for Aggregator above. Until this runs, every agent's
+  // execute() rejects all calls, including Coordinator's own dispatch —
+  // coordinator_address defaults to the zero address at construction.
+  for (const address of agentAddresses) {
+    await writeAndWait(client, address, "set_coordinator", [coordinatorAddress]);
+    console.log(`bound agent ${address} to Coordinator(${coordinatorAddress})`);
+  }
+
   console.log("--- GenMesh Core deployment complete ---");
   console.log({
     registryAddress,
@@ -98,3 +108,4 @@ export default async function main(client: GenLayerClient<any>) {
 
   return { registryAddress, coordinatorAddress, aggregatorAddress, agentAddresses };
 }
+
