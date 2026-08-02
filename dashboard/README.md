@@ -57,3 +57,5 @@ The panel only works with studionet (`genlayer-js/chains` →
 `studionet` is hardcoded inside `index.html`) — GenLayer doesn't have a
 testnet/mainnet yet at the time of writing, so this wasn't built out
 ahead of that need.
+[README.md](https://github.com/user-attachments/files/30627497/README.md)
+
