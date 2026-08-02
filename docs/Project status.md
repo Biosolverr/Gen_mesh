@@ -111,7 +111,8 @@ Each Agent:
 - performs independent inference;
 - owns one capability;
 - returns structured output;
-- never references Coordinator.
+- accepts execution triggers only from the single Coordinator it is
+  bound to via `set_coordinator()`, never from an arbitrary caller.
 
 The interface is intentionally identical across all Agents.
 
@@ -303,14 +304,27 @@ These improvements are intentionally outside the MVP scope.
 
 GenMesh inherits GenLayer's security model.
 
-It does not introduce trusted validators, and identity for both
-manifest changes and result submissions is verified at the contract
-level rather than assumed from the caller:
+It does not introduce trusted validators, and identity for manifest
+changes, execution triggers, and result submissions is verified at the
+contract level rather than assumed from the caller:
 
 - `Aggregator.register_task` / `add_expected_agent` require the sender
   to be the bound Coordinator address;
+- each Agent's `execute()` requires the sender to be that Agent's own
+  bound Coordinator address;
 - `Aggregator.submit_result` attributes a result to the transaction
-  sender, not to any value the caller supplies.
+  sender, not to any value the caller supplies, and checks the
+  submitted capability against the one Coordinator registered for that
+  sender via `add_expected_agent`.
+
+The `execute()` restriction was added after external review (Pavel
+Kolosov, Jul 31 2026) identified that an earlier, unrestricted
+`execute()` let any caller supply fabricated task data to a registered
+Agent and pre-empt the Coordinator's own dispatch for that task_id,
+since Aggregator's per-agent submission dedup would silently keep
+whichever submission arrived first. A regression test
+(`test_execute_rejects_non_coordinator_caller`) covers this path in
+`test/test_mesh_e2e.py`.
 
 Every execution step remains independently verifiable through
 Optimistic Democracy.
@@ -345,10 +359,12 @@ explorer.
 `gltest --network studionet` (or `localnet`). It deploys the full mesh,
 submits a task through Coordinator, and polls Aggregator until the task
 is finalized — no manual resends, no manual reads from the dashboard.
-Two additional regression tests in the same file cover sender
-authentication (`submit_result` rejecting an unregistered caller) and
-the coordinator-only manifest restriction (`register_task` rejecting a
-non-Coordinator caller).
+Three additional regression tests in the same file cover sender
+authentication (`submit_result` rejecting an unregistered caller), the
+coordinator-only manifest restriction (`register_task` rejecting a
+non-Coordinator caller), and the coordinator-only execution restriction
+(`execute` rejecting a direct call from a non-Coordinator caller with
+fabricated task data).
 
 Completing an automated run of this test currently requires a full
 local GenLayer Studio environment (Docker, multiple containers, a live
