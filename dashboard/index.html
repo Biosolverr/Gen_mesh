@@ -235,10 +235,18 @@ th{ color:var(--muted); font-weight:500; font-size:10.5px; text-transform:upperc
 const EXPLORER_BASE = "https://explorer-studio.genlayer.com/tx/";
 
 // ---------- contract schema (data-driven form generation) ----------
-// Matches the post-review-fix (2026-07-05) contract interfaces:
+// Matches the post-review-fix (2026-08-01) contract interfaces:
 //  - Aggregator.submit_result no longer takes agent_address (sender-authenticated)
 //  - Aggregator gained set_coordinator (owner-only) and coordinator-only
 //    register_task / add_expected_agent
+//  - add_expected_agent now also takes capability, so Aggregator can
+//    check a submission's capability against what Coordinator actually
+//    registered for that agent on that task (Pavel Kolosov review,
+//    2026-07-31)
+//  - each Agent gained set_coordinator (owner-only), and execute() is
+//    now restricted to that bound Coordinator — an unrestricted
+//    execute() previously let any caller feed an agent fabricated task
+//    data and pre-empt the Coordinator's own dispatch for that task_id
 const CONTRACTS_CONFIG = [
   {
     key: "registry", label: "AgentRegistry", storageKey: "gm_addr_registry", category: "Discovery",
@@ -269,12 +277,12 @@ const CONTRACTS_CONFIG = [
         note: "Coordinator-only. Calling this manually from a human session will correctly fail with \"Only the coordinator can modify a task manifest\" — that rejection is the fix working, not a bug."
       },
       {
-        name: "add_expected_agent", type: "write", params: ["task_id","agent_address"], numParams: ["task_id"],
-        note: "Coordinator-only, same as above — expected to reject manual calls."
+        name: "add_expected_agent", type: "write", params: ["task_id","agent_address","capability"], numParams: ["task_id"],
+        note: "Coordinator-only, same as above — expected to reject manual calls. capability is stored as a commitment: submit_result later must match it exactly for that (task_id, agent) pair."
       },
       {
         name: "submit_result", type: "write", params: ["task_id","capability","verdict","summary"], numParams: ["task_id"],
-        note: "No agent_address parameter — identity is taken from the transaction sender. A manual call from a human session will correctly fail with \"Agent is not part of this task's execution plan\", since your session address isn't a deployed agent contract."
+        note: "No agent_address parameter — identity is taken from the transaction sender. A manual call from a human session will correctly fail with \"Agent is not part of this task's execution plan\", since your session address isn't a deployed agent contract. Even from a real agent address, a capability that doesn't match what add_expected_agent registered for it will correctly fail with \"Submitted capability does not match the registered task commitment\"."
       },
       { name: "get_result", type: "read", params: ["task_id"], numParams: ["task_id"] },
     ]
@@ -283,7 +291,14 @@ const CONTRACTS_CONFIG = [
     key: "security", label: "SecurityAgent", storageKey: "gm_addr_security", category: "Agents",
     methods: [
       { name: "register_self", type: "write", params: [] },
-      { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
+      {
+        name: "set_coordinator", type: "write", params: ["coordinator_address"],
+        note: "Owner-only, one-time bootstrap. Only succeeds if your session key is the account that deployed this Agent. Until this runs, execute() rejects every caller, including the real Coordinator."
+      },
+      {
+        name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"],
+        note: "Coordinator-only. A manual call from a human session will correctly fail with \"Only the coordinator can trigger execution\" — that rejection is the fix working, not a bug (this used to be open to any caller, which let fabricated task data pre-empt the Coordinator's real dispatch)."
+      },
       { name: "get_capability", type: "read", params: [] },
     ]
   },
@@ -291,7 +306,14 @@ const CONTRACTS_CONFIG = [
     key: "research", label: "ResearchAgent", storageKey: "gm_addr_research", category: "Agents",
     methods: [
       { name: "register_self", type: "write", params: [] },
-      { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
+      {
+        name: "set_coordinator", type: "write", params: ["coordinator_address"],
+        note: "Owner-only, one-time bootstrap. Only succeeds if your session key is the account that deployed this Agent. Until this runs, execute() rejects every caller, including the real Coordinator."
+      },
+      {
+        name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"],
+        note: "Coordinator-only. A manual call from a human session will correctly fail with \"Only the coordinator can trigger execution\" — that rejection is the fix working, not a bug (this used to be open to any caller, which let fabricated task data pre-empt the Coordinator's real dispatch)."
+      },
       { name: "get_capability", type: "read", params: [] },
     ]
   },
@@ -299,7 +321,14 @@ const CONTRACTS_CONFIG = [
     key: "finance", label: "FinanceAgent", storageKey: "gm_addr_finance", category: "Agents",
     methods: [
       { name: "register_self", type: "write", params: [] },
-      { name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"] },
+      {
+        name: "set_coordinator", type: "write", params: ["coordinator_address"],
+        note: "Owner-only, one-time bootstrap. Only succeeds if your session key is the account that deployed this Agent. Until this runs, execute() rejects every caller, including the real Coordinator."
+      },
+      {
+        name: "execute", type: "write", params: ["task_id","task_description","capability","aggregator_address"], numParams: ["task_id"],
+        note: "Coordinator-only. A manual call from a human session will correctly fail with \"Only the coordinator can trigger execution\" — that rejection is the fix working, not a bug (this used to be open to any caller, which let fabricated task data pre-empt the Coordinator's real dispatch)."
+      },
       { name: "get_capability", type: "read", params: [] },
     ]
   },
