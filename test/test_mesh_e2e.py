@@ -7,6 +7,16 @@ no manual resends, no manual reads from the dashboard. The LLM calls
 made by the Coordinator and by each Agent are mocked so the test is
 deterministic and does not depend on a live model provider.
 
+Also includes regression tests for three access-control boundaries:
+- Aggregator.submit_result rejecting a forged sender
+- Aggregator.register_task rejecting a non-Coordinator caller
+- Agent.execute rejecting a non-Coordinator caller (added after Pavel
+  Kolosov's review found that an unrestricted execute() let any caller
+  feed an agent fabricated task data and pre-empt the Coordinator's own
+  dispatch for that task_id, since Aggregator's idempotency check
+  silently drops the second, legitimate submission from the same agent
+  address).
+
 Run with:
     gltest test/test_mesh_e2e.py --network studionet
     gltest test/test_mesh_e2e.py --network localnet
@@ -75,7 +85,8 @@ def _transaction_context(validators):
 
 def _deploy_mesh(account, tx_ctx):
     """Deploys Registry -> Aggregator -> Coordinator, binds them, deploys
-    and self-registers all three Agents. Mirrors deploy/deployScript.ts."""
+    and self-registers all three Agents, then binds each agent to
+    Coordinator. Mirrors deploy/deployScript.ts."""
 
     registry = get_contract_factory("AgentRegistry").deploy(
         account=account, transaction_context=tx_ctx
@@ -105,6 +116,17 @@ def _deploy_mesh(account, tx_ctx):
             account=account, transaction_context=tx_ctx
         )
         assert tx_execution_succeeded(receipt), f"{contract_name} failed to self-register"
+
+        # Bind each agent to Coordinator -- until this runs, execute()
+        # rejects every caller, including Coordinator's own dispatch,
+        # since coordinator_address defaults to the zero address.
+        bind_agent_receipt = agent.set_coordinator(
+            args=[coordinator.address]
+        ).transact(account=account, transaction_context=tx_ctx)
+        assert tx_execution_succeeded(bind_agent_receipt), (
+            f"{contract_name} failed to bind to Coordinator"
+        )
+
         agents[contract_name] = agent
 
     return registry, aggregator, coordinator, agents
@@ -206,4 +228,52 @@ def test_register_task_rejects_non_coordinator():
     )
     assert tx_execution_failed(
         receipt, match_std_err=r"Only the coordinator can modify a task manifest"
+    )
+
+
+def test_execute_rejects_non_coordinator_caller():
+    """
+    Regression check for the execute()-pre-empt fix (Pavel Kolosov's
+    review, Jul 31 2026): before this fix, any caller could invoke a
+    registered agent's execute() directly with fabricated task data.
+    The agent would run a real LLM call on that fabricated input and
+    submit_result() under its own legitimate address -- and because
+    Aggregator's submit_result is idempotent per (task_id, agent
+    address), that fabricated result would win, silently no-op'ing the
+    real submission Coordinator's own dispatch produces afterward.
+
+    This test submits a real task first (so the task_id is registered
+    and this agent is a legitimate expected participant), then attempts
+    to call the agent's execute() directly with attacker-supplied task
+    data instead of going through Coordinator -- this must be rejected
+    before it can run any inference or reach Aggregator at all.
+    """
+    account = get_default_account()
+    validators = _mock_validators()
+    tx_ctx = _transaction_context(validators)
+
+    registry, aggregator, coordinator, agents = _deploy_mesh(account, tx_ctx)
+
+    submit_receipt = coordinator.submit_task(args=[TASK_DESCRIPTION]).transact(
+        account=account, transaction_context=tx_ctx
+    )
+    assert tx_execution_succeeded(submit_receipt)
+
+    task_id = 0
+    security_agent = agents["SecurityAgent"]
+
+    # Attacker-controlled call: same task_id, but fabricated task
+    # description, sent directly to the agent instead of via Coordinator.
+    forged_execute_receipt = security_agent.execute(
+        args=[
+            task_id,
+            "Attacker-controlled task text designed to produce a favorable verdict",
+            "security-audit",
+            aggregator.address,
+        ]
+    ).transact(account=account, transaction_context=tx_ctx)
+
+    assert tx_execution_failed(
+        forged_execute_receipt,
+        match_std_err=r"Only the coordinator can trigger execution",
     )
