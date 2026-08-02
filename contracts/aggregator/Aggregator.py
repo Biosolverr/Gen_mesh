@@ -28,9 +28,18 @@ class Aggregator(gl.Contract):
     # вообще.
     submissions: DynArray[AgentSubmission]
 
-    # "Кто ожидается по какой задаче" — вместо вложенной DynArray на
-    # задачу, составной строковый ключ "task_id:address" в плоском TreeMap.
-    expected_flags: TreeMap[str, bool]
+    # "Кто ожидается по какой задаче, и с какой capability" — составной
+    # строковый ключ "task_id:address" в плоском TreeMap, значение —
+    # сама ожидаемая capability (непустая строка = "ожидается"), а не
+    # просто bool. Раньше здесь хранился только bool: submit_result
+    # проверял "зарегистрирован ли этот адрес по этой задаче", но не
+    # проверял, ЧТО именно он должен был сдать — агент (или кто угодно,
+    # пока execute() был не защищён) мог прислать результат под любой
+    # capability, и Aggregator принимал это как есть. Теперь
+    # add_expected_agent обязан указать capability при регистрации
+    # ожидания, а submit_result сверяет присланную capability с этим
+    # обязательством.
+    expected_capabilities: TreeMap[str, str]
     expected_counts: TreeMap[u32, u32]
 
     task_ids: DynArray[u32]
@@ -154,16 +163,18 @@ Respond with JSON only, no markdown formatting.
         self.task_ids.append(task_id)
 
     @gl.public.write
-    def add_expected_agent(self, task_id: u32, agent_address: str):
+    def add_expected_agent(self, task_id: u32, agent_address: str, capability: str):
         self._require_coordinator()
 
         if not self._is_registered(task_id):
             raise gl.vm.UserError("Unknown task_id")
         if self.finalized_flags.get(task_id, False):
             raise gl.vm.UserError("Task already finalized")
+        if not capability.strip():
+            raise gl.vm.UserError("capability is required")
 
         addr = Address(agent_address)
-        self.expected_flags[self._expected_key(task_id, addr)] = True
+        self.expected_capabilities[self._expected_key(task_id, addr)] = capability
 
     @gl.public.write
     def submit_result(
@@ -186,8 +197,21 @@ Respond with JSON only, no markdown formatting.
             return  # поздний результат по уже закрытой задаче — no-op
 
         key = self._expected_key(task_id, sender)
-        if not self.expected_flags.get(key, False):
+        expected_capability = self.expected_capabilities.get(key, "")
+        if not expected_capability:
             raise gl.vm.UserError("Agent is not part of this task's execution plan")
+
+        # Раньше capability принималась от вызывающего без проверки —
+        # даже с верно аутентифицированным sender'ом, агент (или любой
+        # адрес, вызвавший его execute() до фикса execute()) мог сдать
+        # результат под чужой capability, искажая агрегацию по
+        # by_capability в _finalize. Теперь сверяется с тем, что
+        # Coordinator реально зарегистрировал для этого агента и этой
+        # задачи в add_expected_agent.
+        if capability != expected_capability:
+            raise gl.vm.UserError(
+                "Submitted capability does not match the registered task commitment"
+            )
 
         for s in self._submissions_for(task_id):
             if s.agent_address == sender:
@@ -230,3 +254,4 @@ Respond with JSON only, no markdown formatting.
                 for s in subs
             ],
         }
+
