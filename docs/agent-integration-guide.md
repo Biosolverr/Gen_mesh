@@ -9,7 +9,9 @@ Aggregator, or Registry**.
 A new Agent becomes part of the execution graph simply by:
 
 1. deploying the contract;
-2. registering itself in the Registry.
+2. registering itself in the Registry;
+3. binding itself to the Coordinator address that will dispatch tasks
+   to it.
 
 Everything else is discovered automatically at runtime.
 
@@ -22,14 +24,20 @@ Every Agent must satisfy only a small contract.
 It must:
 
 - be a standard `gl.Contract`;
-- expose a public `execute()` method;
+- expose a public `execute()` method, callable only by its bound
+  Coordinator;
 - expose a `register_self()` method;
+- expose a `set_coordinator()` method, callable only by its owner;
 - define a capability string;
 - register itself inside the Registry.
 
 Nothing else is required.
 
-Agents remain completely independent Intelligent Contracts.
+Agents remain independent Intelligent Contracts — each one still owns
+its own domain logic, state, and capability, and is reusable across any
+Coordinator that binds to it. Independence here means Agents don't
+embed Coordinator's planning logic or know about other Agents, not that
+they accept calls from anyone.
 
 ---
 
@@ -53,6 +61,19 @@ Coordinator does not know what happens internally.
 Aggregator does not know how the result was produced.
 
 Only the interface is shared.
+
+`execute()` accepts calls only from the agent's bound Coordinator
+address (`gl.message.sender_address == self.coordinator_address`). An
+earlier version left this open to any caller, on the assumption that an
+Agent holds no state a malicious call could corrupt directly. That
+assumption missed one thing: a caller could feed `execute()` fabricated
+`task_description` for a real, already-registered `task_id`, and the
+Agent — still using its own genuine, registered address — would submit
+that fabricated result to Aggregator. Because Aggregator deduplicates
+submissions per `(task_id, agent address)`, that forged submission
+would win, silently discarding the real one Coordinator's own dispatch
+produces afterward. Restricting the caller closes this: task content
+now only ever reaches an Agent through Coordinator's trusted dispatch.
 
 ---
 
@@ -82,6 +103,42 @@ The Agent proves ownership simply by calling Registry from its own
 contract address. Only the agent itself — or the Registry's owner, for
 initial bootstrap — can register a given address. No unrelated third
 party can register a contract on someone else's behalf.
+
+---
+
+# Binding to a Coordinator
+
+After registering, each Agent must also be bound to the Coordinator
+that will dispatch tasks to it:
+
+```
+Deploy Agent
+
+↓
+
+register_self()
+
+↓
+
+set_coordinator(coordinator_address)
+
+↓
+
+execute() now accepts calls from that Coordinator only
+```
+
+`set_coordinator()` may only be called by the Agent's owner (the
+account that deployed it) — the same one-owner, one-time-bootstrap
+pattern already used for `Aggregator.set_coordinator()`. Until this
+runs, `coordinator_address` defaults to the zero address and
+`execute()` rejects every caller, including a legitimate Coordinator
+that hasn't been bound yet.
+
+This is a separate step from registration deliberately: Registry
+discovery and Coordinator dispatch rights are independent concerns. An
+Agent can be discoverable in Registry without yet being callable by any
+particular Coordinator, and re-binding to a different Coordinator later
+doesn't require re-registering.
 
 ---
 
@@ -236,30 +293,36 @@ Coordinator.
 
 Agents are never trusted simply because Coordinator called them.
 
-Every invocation is treated as an ordinary contract call.
+Every invocation is treated as an ordinary contract call, and `execute()`
+now additionally verifies the caller is the Agent's bound Coordinator
+before doing anything else.
 
 The Agent validates:
 
+- caller identity (must be the bound Coordinator);
 - capability;
 - task input;
 - local execution rules.
 
-There is no privileged caller.
+The only privileged caller in this model is the bound Coordinator, and
+that privilege is scoped to nothing more than triggering `execute()` —
+it grants no access to any other Agent state or method.
 
 ---
 
-# Coordinator Independence
+# Coordinator Relationship
 
-Agents never reference Coordinator.
+Agents reference exactly one piece of Coordinator-related state: the
+address of the Coordinator currently allowed to call `execute()`. They
+still hold:
 
-There is:
+- no coordinator whitelist (only one bound address, replaceable via a
+  fresh `set_coordinator()` call by the owner);
+- no coordinator planning logic;
+- no coordinator state beyond that single address;
+- no awareness of other Agents.
 
-- no coordinator address;
-- no coordinator whitelist;
-- no coordinator permission;
-- no coordinator state.
-
-The execution relationship is temporary.
+The execution relationship per task remains temporary:
 
 ```
 Coordinator
@@ -273,7 +336,9 @@ execute()
 Finished
 ```
 
-After execution the relationship disappears.
+After execution the relationship for that task disappears — only the
+binding itself (which Coordinator may call `execute()` at all) persists
+across tasks, until explicitly rebound.
 
 ---
 
@@ -293,7 +358,7 @@ They never communicate with:
 
 - Registry
 - other Agents
-- Coordinator
+- Coordinator, beyond accepting its calls to `execute()`
 
 This keeps the execution graph loosely coupled.
 
@@ -317,7 +382,10 @@ The internal reasoning may differ completely between Agents.
 
 Aggregator only consumes the standardized output, and attributes it to
 whichever address actually sent the transaction — not to a value the
-Agent's code could set arbitrarily.
+Agent's code could set arbitrarily. Aggregator additionally verifies
+the submitted capability against the one Coordinator registered for
+that Agent on that task, so an Agent's submission can't be attributed to
+a capability it wasn't actually assigned.
 
 ---
 
@@ -430,6 +498,8 @@ Implement:
 execute()
 
 register_self()
+
+set_coordinator()
 ```
 
 Step 2
@@ -456,12 +526,20 @@ Call:
 register_self()
 ```
 
+Step 5
+
+Call:
+
+```
+set_coordinator(coordinator_address)
+```
+
 Done.
 
 Coordinator immediately discovers the new capability during the next
-request.
+request, and — once bound — is able to dispatch to it.
 
-No redeployment is required.
+No redeployment of Coordinator, Aggregator, or Registry is required.
 
 ---
 
@@ -487,9 +565,8 @@ Because capabilities are loaded at runtime:
 - no capability list exists;
 - no switch statement exists.
 
-Adding Agents changes only Registry state.
-
-Coordinator logic remains unchanged.
+Adding Agents changes only Registry state and each new Agent's own
+Coordinator binding. Coordinator's own logic remains unchanged.
 
 ---
 
@@ -523,7 +600,7 @@ Recommended guidelines:
 - keep capabilities narrow;
 - return structured JSON;
 - avoid hidden dependencies;
-- never reference Coordinator;
+- accept execution calls only from a bound Coordinator;
 - avoid storing execution state;
 - keep prompts domain-specific;
 - make execution deterministic whenever possible.
@@ -535,13 +612,15 @@ Recommended guidelines:
 An Agent is **not** a worker owned by Coordinator.
 
 An Agent is a fully independent Intelligent Contract that happens to
-participate in a larger execution graph.
+participate in a larger execution graph, and that only accepts
+execution triggers from the specific Coordinator it has chosen to bind
+to.
 
 That distinction is fundamental.
 
 GenMesh composes autonomous Intelligent Contracts rather than embedding
 multiple roles inside a single orchestrator.
 
-This makes every Agent reusable across multiple Coordinators, multiple
-applications, and future execution graphs without requiring any changes
-to the Agent itself.
+This makes every Agent reusable across multiple Coordinators over time
+(by rebinding), multiple applications, and future execution graphs,
+without requiring any changes to the Agent's own domain logic.
