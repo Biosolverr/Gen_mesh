@@ -86,5 +86,10 @@ jobs:
       # this is an upstream GenLayer Studio backend bug, not an issue with
       # this repository's contracts or test. If this step times out, see
       # the attached debugging log for full reproduction details.
-      - name: Run mesh e2e test
-        run: gltest test/test_mesh_e2e.py --network localnet
+      #
+      # Runs the whole test/ directory now, not just test_mesh_e2e.py --
+      # this picks up test_aggregator_capability_commitment.py too
+      # (added alongside the execute()-restriction and capability-binding
+      # fix for Pavel Kolosov's review).
+      - name: Run mesh test suite
+        run: gltest test/ --network localnet
