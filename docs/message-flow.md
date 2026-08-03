@@ -1,3 +1,5 @@
+# Message Flow & Consensus Integration
+
 ## Transactions in One Run
 
 | # | Contract | Method | Type | Trigger |
@@ -95,4 +97,3 @@ used:
   — the same mechanism Coordinator uses for capability matching and
   each Agent uses for domain inference — applied again at the
   Aggregator level when a genuine disagreement arises.
-Uploading message-flow.md…]()
