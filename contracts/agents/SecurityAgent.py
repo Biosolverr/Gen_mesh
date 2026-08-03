@@ -17,6 +17,9 @@ class SecurityAgent(gl.Contract):
     version: str
     description: str
 
+    ALLOWED_VERDICTS = {"low", "medium", "high"}
+    MAX_TASK_DESCRIPTION_LENGTH = 4000
+
     def __init__(self, registry_address: str):
         self.owner = gl.message.sender_address
         self.registry_address = Address(registry_address)
@@ -70,6 +73,10 @@ class SecurityAgent(gl.Contract):
             raise gl.vm.UserError("Capability mismatch")
         if not task_description.strip():
             raise gl.vm.UserError("Empty task description")
+        if len(task_description) > self.MAX_TASK_DESCRIPTION_LENGTH:
+            raise gl.vm.UserError(
+                f"task_description exceeds {self.MAX_TASK_DESCRIPTION_LENGTH} characters"
+            )
 
         task_text = task_description
 
@@ -93,13 +100,27 @@ Assess the risk level and explain briefly why. Respond as strict JSON:
 
         result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
 
+        # Раньше result.get("verdict", "unknown") пропускал ЛЮБУЮ строку
+        # дальше в Aggregator как есть — LLM (или подделавший вывод
+        # leader) может вернуть нестандартное значение вроде "critical",
+        # которое не входит в Aggregator._deterministic_aggregate's
+        # negative_verdicts и тем самым обходит escalation, хотя по
+        # смыслу это явно негативный вердикт. Fail-safe: любой вердикт
+        # за пределами собственного словаря агента нормализуется в
+        # самый строгий (escalating) вариант этого словаря, а не
+        # проходит непризнанным.
+        verdict = result.get("verdict", "")
+        if verdict not in self.ALLOWED_VERDICTS:
+            verdict = "high"
+        summary = result.get("summary", "")
+
         # Результат уходит только через контрактный интерфейс.
         aggregator = gl.get_contract_at(Address(aggregator_address))
         aggregator.emit(on="finalized").submit_result(
             task_id,
             self.capability,
-            result.get("verdict", "unknown"),
-            result.get("summary", ""),
+            verdict,
+            summary,
         )
 
     @gl.public.view
