@@ -462,3 +462,5 @@ Potential research directions include:
 These extensions can be added without changing the core architecture,
 demonstrating that GenMesh is designed as an extensible execution
 primitive rather than a fixed application.
+[Uploading project-status.md…]()
+
