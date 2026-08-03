@@ -20,6 +20,10 @@ class Aggregator(gl.Contract):
     # register_task / add_expected_agent are rejected until this is bound.
     coordinator_address: Address
 
+    MAX_CAPABILITY_LENGTH = 64
+    MAX_VERDICT_LENGTH = 64
+    MAX_SUMMARY_LENGTH = 4000
+
     # Плоский список ПО ВСЕМ задачам сразу — единственная DynArray в этом
     # контракте, и она top-level (auto-инициализируется фреймворком при
     # деплое), поэтому append() безопасен. Никаких DynArray/TreeMap не
@@ -117,7 +121,24 @@ Respond with JSON only, no markdown formatting.
                 "must match; exact wording may differ."
             ),
         )
-        parsed = json.loads(raw)
+        # Раньше здесь был безусловный parsed.get(...), который
+        # предполагал, что raw — валидный JSON-объект. Если LLM (или
+        # смошенничавший leader) вернёт не-объект (например, JSON-массив)
+        # или невалидный JSON вообще, .get() на не-dict бросал бы
+        # AttributeError прямо внутри submit_result — а поскольку это
+        # последняя транзакция, наполняющая expected_count, откат этой
+        # транзакции откатывает и только что добавленный submission,
+        # и задача навсегда остаётся недофинализированной без публичного
+        # способа повторить попытку. Теперь любая неожиданная форма
+        # results падает не в ошибку транзакции, а в безопасный
+        # детерминированный fallback.
+        try:
+            parsed = json.loads(raw)
+        except (ValueError, TypeError):
+            parsed = {}
+        if not isinstance(parsed, dict):
+            parsed = {}
+
         return parsed.get("verdict", "unresolved"), parsed.get("summary", "")
 
     def _finalize(self, task_id: u32, submissions: list):
@@ -172,6 +193,8 @@ Respond with JSON only, no markdown formatting.
             raise gl.vm.UserError("Task already finalized")
         if not capability.strip():
             raise gl.vm.UserError("capability is required")
+        if len(capability) > self.MAX_CAPABILITY_LENGTH:
+            raise gl.vm.UserError(f"capability exceeds {self.MAX_CAPABILITY_LENGTH} characters")
 
         addr = Address(agent_address)
         self.expected_capabilities[self._expected_key(task_id, addr)] = capability
@@ -189,6 +212,11 @@ Respond with JSON only, no markdown formatting.
         # вызывающий указывал сам — контракт верил ему на слово, и любой
         # адрес мог выдать себя за любого агента.
         sender = gl.message.sender_address
+
+        if len(verdict) > self.MAX_VERDICT_LENGTH:
+            raise gl.vm.UserError(f"verdict exceeds {self.MAX_VERDICT_LENGTH} characters")
+        if len(summary) > self.MAX_SUMMARY_LENGTH:
+            raise gl.vm.UserError(f"summary exceeds {self.MAX_SUMMARY_LENGTH} characters")
 
         if not self._is_registered(task_id):
             raise gl.vm.UserError("Unknown task_id")
@@ -254,4 +282,5 @@ Respond with JSON only, no markdown formatting.
                 for s in subs
             ],
         }
+
 
