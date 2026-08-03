@@ -109,3 +109,4 @@ export default async function main(client: GenLayerClient<any>) {
   return { registryAddress, coordinatorAddress, aggregatorAddress, agentAddresses };
 }
 
+
