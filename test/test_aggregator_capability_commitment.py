@@ -96,3 +96,4 @@ def test_submit_result_accepts_matching_capability():
     assert result["finalized"] is True
     assert len(result["submissions"]) == 1
     assert result["submissions"][0]["capability"] == EXPECTED_CAPABILITY
+
