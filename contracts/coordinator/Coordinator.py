@@ -7,6 +7,12 @@ class Coordinator(gl.Contract):
     aggregator_address: Address
     task_counter: u32
 
+    # Leaves headroom below the true u32 ceiling so the guard below can
+    # fire with a clear message instead of task_counter silently
+    # wrapping (or the increment reverting with an opaque VM error).
+    MAX_TASK_ID = u32(4294967294)
+    MAX_TASK_DESCRIPTION_LENGTH = 4000
+
     def __init__(self, registry_address: str, aggregator_address: str):
         self.registry_address = Address(registry_address)
         self.aggregator_address = Address(aggregator_address)
@@ -18,6 +24,13 @@ class Coordinator(gl.Contract):
 
     @gl.public.write
     def submit_task(self, task_description: str) -> u32:
+        if not task_description.strip():
+            raise gl.vm.UserError("task_description is empty")
+        if len(task_description) > self.MAX_TASK_DESCRIPTION_LENGTH:
+            raise gl.vm.UserError(
+                f"task_description exceeds {self.MAX_TASK_DESCRIPTION_LENGTH} characters"
+            )
+
         registry = gl.get_contract_at(self.registry_address)
 
         # 1. Детерминированное чтение: какие capability вообще существуют.
@@ -75,6 +88,11 @@ Sort the list alphabetically.
 
         if not assigned:
             raise gl.vm.UserError("No active agents available for required capabilities")
+
+        if self.task_counter >= self.MAX_TASK_ID:
+            raise gl.vm.UserError(
+                "Maximum number of tasks reached for this Coordinator; redeploy required"
+            )
 
         task_id = self.task_counter
         self.task_counter += u32(1)
