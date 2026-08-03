@@ -14,6 +14,9 @@ class ResearchAgent(gl.Contract):
     version: str
     description: str
 
+    ALLOWED_VERDICTS = {"confirmed", "unconfirmed", "inconclusive"}
+    MAX_TASK_DESCRIPTION_LENGTH = 4000
+
     def __init__(self, registry_address: str):
         self.owner = gl.message.sender_address
         self.registry_address = Address(registry_address)
@@ -62,6 +65,10 @@ class ResearchAgent(gl.Contract):
             raise gl.vm.UserError("Capability mismatch")
         if not task_description.strip():
             raise gl.vm.UserError("Empty task description")
+        if len(task_description) > self.MAX_TASK_DESCRIPTION_LENGTH:
+            raise gl.vm.UserError(
+                f"task_description exceeds {self.MAX_TASK_DESCRIPTION_LENGTH} characters"
+            )
 
         task_text = task_description
 
@@ -86,12 +93,20 @@ Respond as strict JSON:
 
         result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
 
+        # Fail-safe: нестандартный вердикт нормализуется в самый
+        # консервативный вариант собственного словаря агента, а не
+        # проходит непризнанным мимо Aggregator's escalation logic.
+        verdict = result.get("verdict", "")
+        if verdict not in self.ALLOWED_VERDICTS:
+            verdict = "inconclusive"
+        summary = result.get("summary", "")
+
         aggregator = gl.get_contract_at(Address(aggregator_address))
         aggregator.emit(on="finalized").submit_result(
             task_id,
             self.capability,
-            result.get("verdict", "unknown"),
-            result.get("summary", ""),
+            verdict,
+            summary,
         )
 
     @gl.public.view
