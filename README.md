@@ -289,12 +289,12 @@ gltest --network localnet
 
 | Contract | Address |
 |---|---|
-| AgentRegistry | `0xAc2053816933fF087712572fC65B9651A7Da90e9` |
-| Coordinator | `0xDb924BE7f03470566Dff0ece04DD6E5896A7249f` |
-| Aggregator | `0xA5c46A71793b7AC006f5e411CC6a83A425fdda6B` |
-| SecurityAgent | `0x0742D562e638eef345263B48c5cd01a6B417C4D5` |
-| ResearchAgent | `0x99E7D545B7A33d63D2DEa7EAc2c6F22253db0A17` |
-| FinanceAgent | `0x2223d0cb31aDD28C670aeAfd4167BC4B952EA7Ec` |
+| AgentRegistry | `0xE9db8f162378258e8116DE2e3db57c9e58B4fF5d` |
+| Coordinator | `0xe822a83B3EBF9f52c2Cdab3DCDE8f00D4bA0FD87` |
+| Aggregator | `0x8c2714ea60FDc550Ff45C08c88D26e74Af4438E3` |
+| SecurityAgent | `0xD0949F5529Be66d4eb4c5D7b5a35EBe1216409b3` |
+| ResearchAgent | `0x7C2eFc70e337890aDfF35292A000fb2ce4A6efeA` |
+| FinanceAgent | `0xc920C49c24ADda446602d5B8E04013f8ac9cd4Bf` |
 
 These are studionet addresses and may be redeployed as the network
 resets; treat them as the current reference deployment rather than a
